@@ -4,14 +4,14 @@
     "builder": "NIXPACKS",
     "buildCommand": "pip install --no-cache-dir --no-deps -r requirements.txt",
     "watchPatterns": ["**/*.py", "**/*.txt"],
-    "healthcheckPath": "/health",
-    "healthcheckTimeout": 300
+    "healthcheckPath": "/startup",
+    "healthcheckTimeout": 60
   },
   "deploy": {
     "startCommand": "python app.py",
-    "healthcheckPath": "/health",
-    "healthcheckTimeout": 300,
+    "healthcheckPath": "/startup",
+    "healthcheckTimeout": 60,
     "restartPolicyType": "ON_FAILURE",
-    "restartPolicyMaxRetries": 5
+    "restartPolicyMaxRetries": 3
   }
 }

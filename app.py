@@ -697,7 +697,14 @@ class DocumentProcessor:
         return text.strip()
 
 # Initialize processor
-processor = DocumentProcessor()
+processor = None
+
+def get_processor():
+    """Lazy initialization of processor for faster startup"""
+    global processor
+    if processor is None:
+        processor = DocumentProcessor()
+    return processor
 
 @app.route('/')
 def root():
@@ -706,6 +713,15 @@ def root():
         'status': 'ok',
         'message': 'PDF Watermark Remover is running',
         'service': 'PDF Watermark Remover - Two Sections'
+    })
+
+@app.route('/startup')
+def startup():
+    """Startup endpoint for Railway - responds immediately"""
+    return jsonify({
+        'status': 'ready',
+        'message': 'App startup complete',
+        'timestamp': time.time()
     })
 
 @app.route('/home')
@@ -1200,7 +1216,7 @@ def convert_document():
         logger.info(f"File uploaded: {filename} ({file_size // 1024} KB) for {section_type} section")
         
         # Process document
-        output_path, metadata = processor.process_document(file_path, section_type)
+        output_path, metadata = get_processor().process_document(file_path, section_type)
         
         # Clean up uploaded file
         try:
