@@ -37,13 +37,12 @@ except ImportError as e:
     print("Please install requirements: pip install -r requirements.txt")
     sys.exit(1)
 
-# Configure logging
+# Configure logging for Railway (no file logging)
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(levelname)s - %(message)s',
     handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler('converter.log')
+        logging.StreamHandler()
     ]
 )
 logger = logging.getLogger(__name__)
@@ -544,49 +543,6 @@ def home():
                 color: #666;
                 line-height: 1.5;
             }
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 30px;
-                margin-bottom: 40px;
-            }
-
-            .section {
-                background: #f8f9fa;
-                border-radius: 15px;
-                padding: 30px;
-                text-align: center;
-                border: 2px solid transparent;
-                transition: all 0.3s ease;
-                cursor: pointer;
-            }
-
-            .section:hover {
-                border-color: #4CAF50;
-                transform: translateY(-5px);
-                box-shadow: 0 10px 25px rgba(0, 0, 0, 0.1);
-            }
-
-            .section.active {
-                border-color: #4CAF50;
-                background: #f0fff0;
-            }
-
-            .section-icon {
-                font-size: 3em;
-                margin-bottom: 20px;
-            }
-
-            .section-title {
-                font-size: 1.5em;
-                font-weight: 600;
-                color: #333;
-                margin-bottom: 15px;
-            }
-
-            .section-desc {
-                color: #666;
-                line-height: 1.5;
-            }
 
             .drop-zone {
                 border: 3px dashed #ddd;
@@ -718,24 +674,6 @@ def home():
             <p class="subtitle">Two sections: English (text) and Math (LaTeX)</p>
 
             <div class="sections">
-                <div class="section" id="englishSection" onclick="selectSection('english')">
-                    <div class="section-icon">📝</div>
-                    <div class="section-title">English Section</div>
-                    <div class="section-desc">
-                        Remove watermarks and convert to Word with clean text formatting.
-                        Perfect for documents, reports, and general text content.
-                    </div>
-                </div>
-
-                <div class="section" id="mathSection" onclick="selectSection('math')">
-                    <div class="section-icon">🧮</div>
-                    <div class="section-title">Math Section</div>
-                    <div class="section-desc">
-                        Auto-detect math functions and convert to Word with LaTeX content.
-                        Ideal for academic papers, equations, and mathematical documents.
-                    </div>
-                </div>
-            </div>
                 <div class="section" id="englishSection" onclick="selectSection('english')">
                     <div class="section-icon">📝</div>
                     <div class="section-title">English Section</div>
