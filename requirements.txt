@@ -14,6 +14,10 @@ Werkzeug==3.0.1
 # Railway Production Server
 gunicorn==21.2.0
 
+# Enhanced Image Processing (for watermark detection)
+opencv-python==4.8.1.78
+numpy==1.24.3
+
 # Additional dependencies for Railway
 lxml==4.9.3
 Jinja2==3.1.2

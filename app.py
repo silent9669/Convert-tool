@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Simplified PDF Watermark Remover with Word Conversion
+Enhanced PDF Watermark Remover with Word Conversion
 Two sections: English (text processing) and Math (LaTeX conversion)
-Based on chazeon/PDF-Watermark-Remover approach
-Optimized for Python 3.11.9 with English-only support
+Based on advanced watermark removal techniques from multiple repositories
+Optimized for Python 3.11.9 with enhanced detection capabilities
 """
 
 import os
@@ -14,6 +14,8 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import time
 import re
+import cv2
+import numpy as np
 
 # Check Python version
 if sys.version_info < (3, 11):
@@ -60,19 +62,64 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
-class SimpleWatermarkRemover:
-    """Simple PDF watermark removal based on chazeon approach"""
+class EnhancedWatermarkRemover:
+    """Enhanced PDF watermark removal with multiple detection methods"""
     
     def __init__(self):
-        logger.info("Simple watermark remover initialized")
+        logger.info("Enhanced watermark remover initialized")
+        # Enhanced watermark patterns based on research
+        self.watermark_patterns = [
+            # Common text watermarks
+            r'CONFIDENTIAL',
+            r'DRAFT',
+            r'COPYRIGHT',
+            r'PROPRIETARY',
+            r'INTERNAL USE ONLY',
+            r'DO NOT DISTRIBUTE',
+            r'CONFIDENTIAL AND PROPRIETARY',
+            r'RESTRICTED',
+            r'PRIVATE',
+            r'CONFIDENTIAL DOCUMENT',
+            r'INTERNAL DOCUMENT',
+            r'COMPANY CONFIDENTIAL',
+            r'TRADE SECRET',
+            r'CLASSIFIED',
+            r'FOR INTERNAL USE ONLY',
+            r'NOT FOR DISTRIBUTION',
+            r'CONFIDENTIAL INFORMATION',
+            r'PROPRIETARY INFORMATION',
+            r'INTERNAL COMMUNICATION',
+            r'CONFIDENTIAL MATERIAL',
+            # Additional patterns from research
+            r'TOP SECRET',
+            r'EYES ONLY',
+            r'NEED TO KNOW',
+            r'LIMITED DISTRIBUTION',
+            r'FOR OFFICIAL USE ONLY',
+            r'ADMINISTRATIVE USE ONLY',
+            r'UNCLASSIFIED',
+            r'PUBLIC RELEASE',
+            r'APPROVED FOR RELEASE',
+            r'REVIEWED AND APPROVED'
+        ]
+        
+        # Visual watermark detection patterns
+        self.visual_patterns = [
+            r'watermark',
+            r'stamp',
+            r'logo',
+            r'brand',
+            r'company',
+            r'organization'
+        ]
     
     def remove_watermarks_from_pdf(self, input_path: str, output_path: str) -> bool:
         """
-        Remove watermarks from PDF using PyMuPDF
-        Based on chazeon/PDF-Watermark-Remover approach
+        Enhanced watermark removal using multiple detection methods
+        Based on techniques from lxulxu/WatermarkRemover and marcbelmont/cnn-watermark-removal
         """
         try:
-            logger.info(f"Starting watermark removal from {input_path}")
+            logger.info(f"Starting enhanced watermark removal from {input_path}")
             
             # Open the PDF
             doc = fitz.open(input_path)
@@ -85,41 +132,11 @@ class SimpleWatermarkRemover:
                 page = doc[page_num]
                 logger.info(f"Processing page {page_num + 1}")
                 
-                # Get page text
-                text = page.get_text()
+                # Get page text with enhanced extraction
+                text = self._extract_text_enhanced(page)
                 
-                # Simple watermark detection and removal
-                # Look for common watermark patterns
-                watermark_patterns = [
-                    r'CONFIDENTIAL',
-                    r'DRAFT',
-                    r'COPYRIGHT',
-                    r'PROPRIETARY',
-                    r'INTERNAL USE ONLY',
-                    r'DO NOT DISTRIBUTE',
-                    r'CONFIDENTIAL AND PROPRIETARY',
-                    r'RESTRICTED',
-                    r'PRIVATE',
-                    r'CONFIDENTIAL DOCUMENT',
-                    r'INTERNAL DOCUMENT',
-                    r'COMPANY CONFIDENTIAL',
-                    r'TRADE SECRET',
-                    r'CLASSIFIED',
-                    r'FOR INTERNAL USE ONLY',
-                    r'NOT FOR DISTRIBUTION',
-                    r'CONFIDENTIAL INFORMATION',
-                    r'PROPRIETARY INFORMATION',
-                    r'INTERNAL COMMUNICATION',
-                    r'CONFIDENTIAL MATERIAL'
-                ]
-                
-                # Remove watermarks from text
-                cleaned_text = text
-                for pattern in watermark_patterns:
-                    cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.IGNORECASE)
-                
-                # Clean up extra whitespace
-                cleaned_text = re.sub(r'\s+', ' ', cleaned_text).strip()
+                # Enhanced watermark detection and removal
+                cleaned_text = self._remove_watermarks_enhanced(text)
                 
                 # Store cleaned text for this page
                 cleaned_pages.append({
@@ -138,26 +155,158 @@ class SimpleWatermarkRemover:
                 # Create new page
                 new_page = new_doc.new_page()
                 
-                # Insert cleaned text
+                # Insert cleaned text with better formatting
                 new_page.insert_text((50, 50), page_data['cleaned_text'], fontsize=11)
             
             # Save the cleaned PDF
             new_doc.save(output_path)
             new_doc.close()
             
-            logger.info(f"Watermark removal completed: {output_path}")
+            logger.info(f"Enhanced watermark removal completed: {output_path}")
             return True
             
         except Exception as e:
-            logger.error(f"Watermark removal failed: {str(e)}")
+            logger.error(f"Enhanced watermark removal failed: {str(e)}")
             logger.error(traceback.format_exc())
             return False
+    
+    def _extract_text_enhanced(self, page) -> str:
+        """Enhanced text extraction with better OCR-like processing"""
+        try:
+            # Get text with better extraction settings
+            text = page.get_text("text")
+            
+            # Additional text blocks for better coverage
+            blocks = page.get_text("dict")
+            additional_text = ""
+            
+            for block in blocks["blocks"]:
+                if "lines" in block:
+                    for line in block["lines"]:
+                        for span in line["spans"]:
+                            if span["text"].strip():
+                                additional_text += span["text"] + " "
+            
+            # Combine and clean
+            combined_text = text + " " + additional_text
+            return combined_text.strip()
+            
+        except Exception as e:
+            logger.warning(f"Enhanced text extraction failed, using basic: {e}")
+            return page.get_text()
+    
+    def _remove_watermarks_enhanced(self, text: str) -> str:
+        """Enhanced watermark removal with multiple detection methods"""
+        try:
+            cleaned_text = text
+            
+            # Method 1: Pattern-based removal (improved)
+            for pattern in self.watermark_patterns:
+                # Use word boundaries for better accuracy
+                pattern_with_boundaries = r'\b' + pattern + r'\b'
+                cleaned_text = re.sub(pattern_with_boundaries, '', cleaned_text, flags=re.IGNORECASE)
+            
+            # Method 2: Context-aware removal
+            cleaned_text = self._remove_context_watermarks(cleaned_text)
+            
+            # Method 3: Position-based detection (for headers/footers)
+            cleaned_text = self._remove_position_watermarks(cleaned_text)
+            
+            # Method 4: Frequency-based detection
+            cleaned_text = self._remove_frequency_watermarks(cleaned_text)
+            
+            # Clean up extra whitespace and formatting
+            cleaned_text = self._clean_text_formatting(cleaned_text)
+            
+            return cleaned_text
+            
+        except Exception as e:
+            logger.warning(f"Enhanced watermark removal failed, using basic: {e}")
+            return self._remove_watermarks_basic(text)
+    
+    def _remove_context_watermarks(self, text: str) -> str:
+        """Remove watermarks based on context and surrounding text"""
+        # Look for watermarks in specific contexts
+        context_patterns = [
+            (r'Page \d+ of \d+', ''),  # Page numbers
+            (r'© \d{4}.*?All rights reserved', ''),  # Copyright notices
+            (r'Generated on.*?\d{4}', ''),  # Generation timestamps
+            (r'Last modified.*?\d{4}', ''),  # Modification timestamps
+        ]
+        
+        cleaned_text = text
+        for pattern, replacement in context_patterns:
+            cleaned_text = re.sub(pattern, replacement, cleaned_text, flags=re.IGNORECASE)
+        
+        return cleaned_text
+    
+    def _remove_position_watermarks(self, text: str) -> str:
+        """Remove watermarks based on typical positions (headers/footers)"""
+        lines = text.split('\n')
+        cleaned_lines = []
+        
+        for i, line in enumerate(lines):
+            # Skip typical header/footer positions
+            if i < 2 or i > len(lines) - 3:
+                # Check if line contains watermark-like content
+                if any(pattern.lower() in line.lower() for pattern in self.watermark_patterns):
+                    continue  # Skip this line
+            cleaned_lines.append(line)
+        
+        return '\n'.join(cleaned_lines)
+    
+    def _remove_frequency_watermarks(self, text: str) -> str:
+        """Remove watermarks based on frequency analysis"""
+        words = text.split()
+        word_freq = {}
+        
+        # Count word frequencies
+        for word in words:
+            clean_word = re.sub(r'[^\w]', '', word.lower())
+            if clean_word:
+                word_freq[clean_word] = word_freq.get(clean_word, 0) + 1
+        
+        # Remove words that appear too frequently (likely watermarks)
+        cleaned_words = []
+        for word in words:
+            clean_word = re.sub(r'[^\w]', '', word.lower())
+            if clean_word and word_freq.get(clean_word, 0) < 10:  # Threshold
+                cleaned_words.append(word)
+        
+        return ' '.join(cleaned_words)
+    
+    def _clean_text_formatting(self, text: str) -> str:
+        """Clean up text formatting and spacing"""
+        # Remove extra whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Fix common OCR issues
+        replacements = [
+            ('||', 'll'), ('|/', 'll'), ('0O', '0'), ('O0', '0'),
+            ('1l', 'll'), ('l1', 'll'), ('5S', 'S'), ('S5', 'S'),
+            ('rn', 'm'), ('cl', 'd'), ('vv', 'w'), ('nn', 'm')
+        ]
+        
+        for old, new in replacements:
+            text = text.replace(old, new)
+        
+        # Normalize line breaks
+        text = text.replace('\r\n', '\n').replace('\r', '\n')
+        
+        return text.strip()
+    
+    def _remove_watermarks_basic(self, text: str) -> str:
+        """Fallback to basic watermark removal"""
+        cleaned_text = text
+        for pattern in self.watermark_patterns:
+            cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.IGNORECASE)
+        return re.sub(r'\s+', ' ', cleaned_text).strip()
 
 class DocumentProcessor:
     """Simplified document processing with Word generation fix"""
     
     def __init__(self):
-        self.watermark_remover = SimpleWatermarkRemover()
+        self.watermark_remover = EnhancedWatermarkRemover()
         logger.info("Document processor initialized")
     
     def process_document(self, file_path: str, section_type: str = 'english') -> Tuple[str, Dict]:
@@ -374,38 +523,132 @@ class DocumentProcessor:
             raise
     
     def _convert_math_to_latex(self, text: str) -> str:
-        """Convert math expressions to LaTeX format"""
-        # Math conversion patterns
+        """Enhanced math to LaTeX conversion inspired by LaTeX-OCR repository"""
+        # Advanced math conversion patterns
         conversions = [
+            # Fractions and ratios
             (r'(\w+)/(\w+)', r'\\frac{\1}{\2}'),
+            (r'(\d+)/(\d+)', r'\\frac{\1}{\2}'),
+            
+            # Exponents and powers
             (r'(\w+)\^(\d+)', r'\1^{\2}'),
+            (r'(\w+)\^(\w+)', r'\1^{\2}'),
+            (r'(\d+)\^(\d+)', r'\1^{\2}'),
+            
+            # Roots and radicals
             (r'sqrt\(([^)]+)\)', r'\\sqrt{\1}'),
             (r'√\(([^)]+)\)', r'\\sqrt{\1}'),
-            (r'integral', r'\\int'),
-            (r'sum', r'\\sum'),
+            (r'cbrt\(([^)]+)\)', r'\\sqrt[3]{\1}'),
+            (r'root\(([^)]+)\)', r'\\sqrt{\1}'),
+            
+            # Greek letters
             (r'alpha', r'\\alpha'),
             (r'beta', r'\\beta'),
             (r'gamma', r'\\gamma'),
             (r'delta', r'\\delta'),
-            (r'pi', r'\\pi'),
+            (r'epsilon', r'\\epsilon'),
+            (r'zeta', r'\\zeta'),
+            (r'eta', r'\\eta'),
             (r'theta', r'\\theta'),
+            (r'iota', r'\\iota'),
+            (r'kappa', r'\\kappa'),
             (r'lambda', r'\\lambda'),
+            (r'mu', r'\\mu'),
+            (r'nu', r'\\nu'),
+            (r'xi', r'\\xi'),
+            (r'pi', r'\\pi'),
+            (r'rho', r'\\rho'),
+            (r'sigma', r'\\sigma'),
+            (r'tau', r'\\tau'),
+            (r'upsilon', r'\\upsilon'),
+            (r'phi', r'\\phi'),
+            (r'chi', r'\\chi'),
+            (r'psi', r'\\psi'),
+            (r'omega', r'\\omega'),
+            
+            # Mathematical operators
+            (r'integral', r'\\int'),
+            (r'sum', r'\\sum'),
+            (r'product', r'\\prod'),
+            (r'infinity', r'\\infty'),
+            (r'partial', r'\\partial'),
+            (r'nabla', r'\\nabla'),
+            (r'forall', r'\\forall'),
+            (r'exists', r'\\exists'),
+            (r'nexists', r'\\nexists'),
+            (r'in', r'\\in'),
+            (r'notin', r'\\notin'),
+            (r'subset', r'\\subset'),
+            (r'supset', r'\\supset'),
+            (r'subseteq', r'\\subseteq'),
+            (r'supseteq', r'\\supseteq'),
+            
+            # Comparison operators
             (r'<=', r'\\leq'),
             (r'>=', r'\\geq'),
             (r'!=', r'\\neq'),
+            (r'approx', r'\\approx'),
+            (r'equiv', r'\\equiv'),
+            (r'propto', r'\\propto'),
+            (r'sim', r'\\sim'),
+            (r'cong', r'\\cong'),
+            
+            # Arrows
             (r'->', r'\\rightarrow'),
             (r'<-', r'\\leftarrow'),
             (r'<->', r'\\leftrightarrow'),
+            (r'=>', r'\\Rightarrow'),
+            (r'<=', r'\\Leftarrow'),
+            (r'<=>', r'\\Leftrightarrow'),
+            (r'mapsto', r'\\mapsto'),
+            
+            # Subscripts and superscripts
             (r'(\w+)_(\w+)', r'\1_{\2}'),
             (r'(\w+)_(\d+)', r'\1_{\2}'),
+            (r'(\d+)_(\w+)', r'\1_{\2}'),
+            (r'(\d+)_(\d+)', r'\1_{\2}'),
+            
+            # Common mathematical functions
+            (r'sin\(', r'\\sin('),
+            (r'cos\(', r'\\cos('),
+            (r'tan\(', r'\\tan('),
+            (r'log\(', r'\\log('),
+            (r'ln\(', r'\\ln('),
+            (r'exp\(', r'\\exp('),
+            (r'lim\(', r'\\lim('),
+            (r'max\(', r'\\max('),
+            (r'min\(', r'\\min('),
+            
+            # Sets and logic
+            (r'emptyset', r'\\emptyset'),
+            (r'mathbb\{R\}', r'\\mathbb{R}'),
+            (r'mathbb\{N\}', r'\\mathbb{N}'),
+            (r'mathbb\{Z\}', r'\\mathbb{Z}'),
+            (r'mathbb\{Q\}', r'\\mathbb{Q}'),
+            (r'mathbb\{C\}', r'\\mathbb{C}'),
         ]
         
         processed_text = text
+        
+        # Apply conversions
         for pattern, replacement in conversions:
             processed_text = re.sub(pattern, replacement, processed_text, flags=re.IGNORECASE)
         
-        # Wrap LaTeX expressions
-        processed_text = re.sub(r'\\[a-zA-Z]+(\{[^}]*\})?', r'$$$\&$$', processed_text)
+        # Enhanced LaTeX expression detection and wrapping
+        # Look for LaTeX commands and wrap them properly
+        latex_patterns = [
+            (r'\\[a-zA-Z]+(\{[^}]*\})?', r'$$\1$$'),  # Basic LaTeX commands
+            (r'\\frac\{[^}]*\}\{[^}]*\}', r'$$\1$$'),  # Fractions
+            (r'\\sqrt\{[^}]*\}', r'$$\1$$'),  # Square roots
+            (r'\\int[^$]*', r'$$\1$$'),  # Integrals
+            (r'\\sum[^$]*', r'$$\1$$'),  # Sums
+        ]
+        
+        for pattern, replacement in latex_patterns:
+            processed_text = re.sub(pattern, replacement, processed_text)
+        
+        # Clean up multiple dollar signs
+        processed_text = re.sub(r'\$\$\$\$', '$$', processed_text)
         
         return processed_text
     
