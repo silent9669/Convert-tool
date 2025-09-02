@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF/Image to Word Converter</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/katex/0.16.8/katex.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/katex/0.16.8/katex.min.css">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <h1>📄 PDF/Image to Word</h1>
+        <p class="subtitle">Convert documents with OCR, Math recognition & Watermark removal</p>
+
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-icon">☁️</div>
+            <div class="drop-text">Drop files here or click to browse</div>
+            <div class="drop-subtext">Supports PDF, JPG, PNG, TIFF, BMP</div>
+            <input type="file" id="fileInput" class="file-input" multiple accept=".pdf,.jpg,.jpeg,.png,.tiff,.bmp">
+        </div>
+
+        <div class="selected-files" id="selectedFiles">
+            <h3>📁 Selected Files:</h3>
+            <div id="fileList"></div>
+        </div>
+
+        <div class="progress-section" id="progressSection">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="status-text" id="statusText">Processing...</div>
+        </div>
+
+        <div class="success-message" id="successMessage">
+            <h3>✅ Processing Complete!</h3>
+            <p>Your documents have been successfully converted. Click download to get your file.</p>
+        </div>
+
+        <div class="error-message" id="errorMessage">
+            <h3>❌ Processing Failed</h3>
+            <p id="errorText">An error occurred during processing.</p>
+        </div>
+
+        <button class="download-btn" id="downloadBtn">
+            💾 Download Word Document
+        </button>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
