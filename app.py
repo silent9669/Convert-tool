@@ -67,58 +67,21 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 class EnhancedWatermarkRemover:
-    """Enhanced PDF watermark removal with multiple detection methods"""
+    """Advanced PDF watermark removal with automatic detection"""
     
     def __init__(self):
-        logger.info("Enhanced watermark remover initialized")
-        # Enhanced watermark patterns based on research
-        self.watermark_patterns = [
-            # Common text watermarks
-            r'CONFIDENTIAL',
-            r'DRAFT',
-            r'COPYRIGHT',
-            r'PROPRIETARY',
-            r'INTERNAL USE ONLY',
-            r'DO NOT DISTRIBUTE',
-            r'CONFIDENTIAL AND PROPRIETARY',
-            r'RESTRICTED',
-            r'PRIVATE',
-            r'CONFIDENTIAL DOCUMENT',
-            r'INTERNAL DOCUMENT',
-            r'COMPANY CONFIDENTIAL',
-            r'TRADE SECRET',
-            r'CLASSIFIED',
-            r'FOR INTERNAL USE ONLY',
-            r'NOT FOR DISTRIBUTION',
-            r'CONFIDENTIAL INFORMATION',
-            r'PROPRIETARY INFORMATION',
-            r'INTERNAL COMMUNICATION',
-            r'CONFIDENTIAL MATERIAL',
-            # Additional patterns from research
-            r'TOP SECRET',
-            r'EYES ONLY',
-            r'NEED TO KNOW',
-            r'LIMITED DISTRIBUTION',
-            r'FOR OFFICIAL USE ONLY',
-            r'ADMINISTRATIVE USE ONLY',
-            r'UNCLASSIFIED',
-            r'PUBLIC RELEASE',
-            r'APPROVED FOR RELEASE',
-            r'REVIEWED AND APPROVED',
-            # Specific watermarks from user's document
-            r'VietAcc',
-            r'VIETACC'
+        logger.info("Enhanced watermark remover initialized with auto-detection")
+        
+        # Base patterns for common watermarks (fallback)
+        self.base_patterns = [
+            r'CONFIDENTIAL', r'DRAFT', r'COPYRIGHT', r'PROPRIETARY',
+            r'RESTRICTED', r'PRIVATE', r'CLASSIFIED', r'TOP SECRET'
         ]
         
-        # Visual watermark detection patterns
-        self.visual_patterns = [
-            r'watermark',
-            r'stamp',
-            r'logo',
-            r'brand',
-            r'company',
-            r'organization'
-        ]
+        # Auto-detection parameters
+        self.watermark_threshold = 0.7  # Similarity threshold for watermark detection
+        self.frequency_threshold = 5    # Minimum frequency to consider as watermark
+        self.position_weight = 0.3      # Weight for position-based detection
     
     def remove_watermarks_from_pdf(self, input_path: str, output_path: str) -> bool:
         """
@@ -203,84 +166,237 @@ class EnhancedWatermarkRemover:
             return page.get_text()
     
     def _remove_watermarks_enhanced(self, text: str) -> str:
-        """Enhanced watermark removal with multiple detection methods"""
+        """Advanced watermark removal with automatic detection"""
         try:
-            cleaned_text = text
+            logger.info("Starting automatic watermark detection and removal")
             
-            # Method 1: Pattern-based removal (improved)
-            for pattern in self.watermark_patterns:
-                # Use word boundaries for better accuracy
-                pattern_with_boundaries = r'\b' + pattern + r'\b'
-                cleaned_text = re.sub(pattern_with_boundaries, '', cleaned_text, flags=re.IGNORECASE)
+            # Step 1: Analyze text structure and extract potential watermarks
+            potential_watermarks = self._detect_watermarks_automatically(text)
+            logger.info(f"Detected {len(potential_watermarks)} potential watermarks")
             
-            # Method 2: Context-aware removal
-            cleaned_text = self._remove_context_watermarks(cleaned_text)
+            # Step 2: Remove detected watermarks
+            cleaned_text = self._remove_detected_watermarks(text, potential_watermarks)
             
-            # Method 3: Position-based detection (for headers/footers)
-            cleaned_text = self._remove_position_watermarks(cleaned_text)
-            
-            # Method 4: Frequency-based detection
-            cleaned_text = self._remove_frequency_watermarks(cleaned_text)
-            
-            # Clean up extra whitespace and formatting
+            # Step 3: Clean up formatting
             cleaned_text = self._clean_text_formatting(cleaned_text)
             
             return cleaned_text
             
         except Exception as e:
-            logger.warning(f"Enhanced watermark removal failed, using basic: {e}")
-            return self._remove_watermarks_basic(text)
+            logger.warning(f"Auto watermark detection failed, using fallback: {e}")
+            return self._remove_watermarks_fallback(text)
     
-    def _remove_context_watermarks(self, text: str) -> str:
-        """Remove watermarks based on context and surrounding text"""
-        # Look for watermarks in specific contexts
+    def _detect_watermarks_automatically(self, text: str) -> List[Dict]:
+        """Automatically detect watermarks using multiple algorithms"""
+        watermarks = []
+        
+        # Method 1: Frequency-based detection
+        freq_watermarks = self._detect_frequency_watermarks(text)
+        watermarks.extend(freq_watermarks)
+        
+        # Method 2: Position-based detection
+        pos_watermarks = self._detect_position_watermarks(text)
+        watermarks.extend(pos_watermarks)
+        
+        # Method 3: Pattern-based detection
+        pattern_watermarks = self._detect_pattern_watermarks(text)
+        watermarks.extend(pattern_watermarks)
+        
+        # Method 4: Context-based detection
+        context_watermarks = self._detect_context_watermarks(text)
+        watermarks.extend(context_watermarks)
+        
+        # Remove duplicates and return
+        unique_watermarks = self._deduplicate_watermarks(watermarks)
+        return unique_watermarks
+    
+    def _detect_frequency_watermarks(self, text: str) -> List[Dict]:
+        """Detect watermarks based on word frequency analysis"""
+        words = re.findall(r'\b\w+\b', text.lower())
+        word_freq = {}
+        
+        # Count frequencies
+        for word in words:
+            if len(word) > 2:  # Skip very short words
+                word_freq[word] = word_freq.get(word, 0) + 1
+        
+        # Find words that appear too frequently (likely watermarks)
+        watermarks = []
+        total_words = len(words)
+        
+        for word, freq in word_freq.items():
+            if freq >= self.frequency_threshold and freq / total_words > 0.05:
+                watermarks.append({
+                    'type': 'frequency',
+                    'text': word,
+                    'confidence': min(freq / total_words, 1.0),
+                    'pattern': r'\b' + re.escape(word) + r'\b'
+                })
+        
+        return watermarks
+    
+    def _detect_position_watermarks(self, text: str) -> List[Dict]:
+        """Detect watermarks based on position (headers/footers)"""
+        lines = text.split('\n')
+        watermarks = []
+        
+        # Check first and last few lines
+        header_lines = lines[:3]
+        footer_lines = lines[-3:] if len(lines) > 3 else []
+        
+        for line in header_lines + footer_lines:
+            line = line.strip()
+            if line and len(line) < 50:  # Short lines in headers/footers
+                # Check if line contains watermark-like content
+                if self._is_watermark_like(line):
+                    watermarks.append({
+                        'type': 'position',
+                        'text': line,
+                        'confidence': 0.8,
+                        'pattern': re.escape(line)
+                    })
+        
+        return watermarks
+    
+    def _detect_pattern_watermarks(self, text: str) -> List[Dict]:
+        """Detect watermarks using pattern matching"""
+        watermarks = []
+        
+        # Check against base patterns
+        for pattern in self.base_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                watermarks.append({
+                    'type': 'pattern',
+                    'text': match,
+                    'confidence': 0.9,
+                    'pattern': r'\b' + re.escape(match) + r'\b'
+                })
+        
+        # Detect repeated phrases
+        repeated_phrases = self._find_repeated_phrases(text)
+        watermarks.extend(repeated_phrases)
+        
+        return watermarks
+    
+    def _detect_context_watermarks(self, text: str) -> List[Dict]:
+        """Detect watermarks based on context and surrounding text"""
+        watermarks = []
+        
+        # Look for copyright notices, page numbers, etc.
         context_patterns = [
-            (r'Page \d+ of \d+', ''),  # Page numbers
-            (r'© \d{4}.*?All rights reserved', ''),  # Copyright notices
-            (r'Generated on.*?\d{4}', ''),  # Generation timestamps
-            (r'Last modified.*?\d{4}', ''),  # Modification timestamps
+            (r'©\s*\d{4}.*?(?:all rights reserved|inc\.|llc\.)', 0.9),
+            (r'page\s+\d+\s+of\s+\d+', 0.8),
+            (r'generated\s+on.*?\d{4}', 0.8),
+            (r'last\s+modified.*?\d{4}', 0.8),
+            (r'confidential.*?document', 0.9),
+            (r'proprietary.*?information', 0.9)
         ]
         
+        for pattern, confidence in context_patterns:
+            matches = re.findall(pattern, text, re.IGNORECASE)
+            for match in matches:
+                watermarks.append({
+                    'type': 'context',
+                    'text': match,
+                    'confidence': confidence,
+                    'pattern': pattern
+                })
+        
+        return watermarks
+    
+    def _is_watermark_like(self, text: str) -> bool:
+        """Check if text looks like a watermark"""
+        # Short text
+        if len(text) > 50:
+            return False
+        
+        # Contains common watermark words
+        watermark_indicators = [
+            'confidential', 'draft', 'copyright', 'proprietary',
+            'restricted', 'private', 'classified', 'internal',
+            'watermark', 'stamp', 'logo', 'brand'
+        ]
+        
+        text_lower = text.lower()
+        for indicator in watermark_indicators:
+            if indicator in text_lower:
+                return True
+        
+        # All caps (common for watermarks)
+        if text.isupper() and len(text) > 3:
+            return True
+        
+        # Contains special characters or formatting
+        if re.search(r'[©®™]', text):
+            return True
+        
+        return False
+    
+    def _find_repeated_phrases(self, text: str) -> List[Dict]:
+        """Find phrases that repeat frequently (likely watermarks)"""
+        watermarks = []
+        
+        # Look for 2-4 word phrases that repeat
+        words = re.findall(r'\b\w+\b', text.lower())
+        
+        for phrase_length in range(2, 5):
+            phrases = {}
+            for i in range(len(words) - phrase_length + 1):
+                phrase = ' '.join(words[i:i + phrase_length])
+                if len(phrase) > 10:  # Skip very short phrases
+                    phrases[phrase] = phrases.get(phrase, 0) + 1
+            
+            # Find frequently repeated phrases
+            for phrase, count in phrases.items():
+                if count >= 3:  # Appears at least 3 times
+                    watermarks.append({
+                        'type': 'repeated_phrase',
+                        'text': phrase,
+                        'confidence': min(count / 10, 1.0),
+                        'pattern': re.escape(phrase)
+                    })
+        
+        return watermarks
+    
+    def _deduplicate_watermarks(self, watermarks: List[Dict]) -> List[Dict]:
+        """Remove duplicate watermarks and merge similar ones"""
+        unique_watermarks = []
+        seen_texts = set()
+        
+        # Sort by confidence (highest first)
+        watermarks.sort(key=lambda x: x['confidence'], reverse=True)
+        
+        for watermark in watermarks:
+            text_lower = watermark['text'].lower()
+            if text_lower not in seen_texts:
+                unique_watermarks.append(watermark)
+                seen_texts.add(text_lower)
+        
+        return unique_watermarks
+    
+    def _remove_detected_watermarks(self, text: str, watermarks: List[Dict]) -> str:
+        """Remove detected watermarks from text"""
         cleaned_text = text
-        for pattern, replacement in context_patterns:
-            cleaned_text = re.sub(pattern, replacement, cleaned_text, flags=re.IGNORECASE)
+        
+        for watermark in watermarks:
+            if watermark['confidence'] >= self.watermark_threshold:
+                pattern = watermark['pattern']
+                cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.IGNORECASE)
+                logger.info(f"Removed watermark: '{watermark['text']}' (confidence: {watermark['confidence']:.2f})")
         
         return cleaned_text
     
-    def _remove_position_watermarks(self, text: str) -> str:
-        """Remove watermarks based on typical positions (headers/footers)"""
-        lines = text.split('\n')
-        cleaned_lines = []
+    def _remove_watermarks_fallback(self, text: str) -> str:
+        """Fallback watermark removal using basic patterns"""
+        cleaned_text = text
         
-        for i, line in enumerate(lines):
-            # Skip typical header/footer positions
-            if i < 2 or i > len(lines) - 3:
-                # Check if line contains watermark-like content
-                if any(pattern.lower() in line.lower() for pattern in self.watermark_patterns):
-                    continue  # Skip this line
-            cleaned_lines.append(line)
+        # Use base patterns as fallback
+        for pattern in self.base_patterns:
+            pattern_with_boundaries = r'\b' + pattern + r'\b'
+            cleaned_text = re.sub(pattern_with_boundaries, '', cleaned_text, flags=re.IGNORECASE)
         
-        return '\n'.join(cleaned_lines)
-    
-    def _remove_frequency_watermarks(self, text: str) -> str:
-        """Remove watermarks based on frequency analysis"""
-        words = text.split()
-        word_freq = {}
-        
-        # Count word frequencies
-        for word in words:
-            clean_word = re.sub(r'[^\w]', '', word.lower())
-            if clean_word:
-                word_freq[clean_word] = word_freq.get(clean_word, 0) + 1
-        
-        # Remove words that appear too frequently (likely watermarks)
-        cleaned_words = []
-        for word in words:
-            clean_word = re.sub(r'[^\w]', '', word.lower())
-            if clean_word and word_freq.get(clean_word, 0) < 10:  # Threshold
-                cleaned_words.append(word)
-        
-        return ' '.join(cleaned_words)
+        return re.sub(r'\s+', ' ', cleaned_text).strip()
     
     def _clean_text_formatting(self, text: str) -> str:
         """Clean up text formatting and spacing"""
@@ -302,12 +418,7 @@ class EnhancedWatermarkRemover:
         
         return text.strip()
     
-    def _remove_watermarks_basic(self, text: str) -> str:
-        """Fallback to basic watermark removal"""
-        cleaned_text = text
-        for pattern in self.watermark_patterns:
-            cleaned_text = re.sub(pattern, '', cleaned_text, flags=re.IGNORECASE)
-        return re.sub(r'\s+', ' ', cleaned_text).strip()
+
 
 class DocumentProcessor:
     """Simplified document processing with Word generation fix"""
