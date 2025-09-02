@@ -698,6 +698,7 @@ class DocumentProcessor:
 
 # Initialize processor
 processor = None
+app_startup_time = None
 
 def get_processor():
     """Lazy initialization of processor for faster startup"""
@@ -721,8 +722,33 @@ def startup():
     return jsonify({
         'status': 'ready',
         'message': 'App startup complete',
-        'timestamp': time.time()
+        'timestamp': time.time(),
+        'startup_time': app_startup_time,
+        'uptime': time.time() - app_startup_time if app_startup_time else 0
     })
+
+@app.route('/ready')
+def ready():
+    """Readiness probe for Railway - checks if app is fully operational"""
+    try:
+        # Quick test of core functionality
+        test_processor = get_processor()
+        return jsonify({
+            'status': 'ready',
+            'message': 'Application fully operational',
+            'timestamp': time.time(),
+            'startup_time': app_startup_time,
+            'uptime': time.time() - app_startup_time if app_startup_time else 0,
+            'processor_status': 'initialized',
+            'railway_ready': True
+        })
+    except Exception as e:
+        return jsonify({
+            'status': 'not_ready',
+            'message': f'Application not ready: {str(e)}',
+            'timestamp': time.time(),
+            'error': str(e)
+        }), 503
 
 @app.route('/home')
 def home():
@@ -1278,6 +1304,10 @@ if __name__ == '__main__':
     print("All dependencies loaded successfully")
     print("Watermark removal algorithms ready")
     print("Document processor ready")
+    
+    # Set startup time for health checks
+    app_startup_time = time.time()
+    print(f"Startup timestamp: {app_startup_time}")
     
     # Get port from environment variable (for Railway/Heroku)
     port = int(os.environ.get('PORT', 5000))
