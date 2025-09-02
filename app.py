@@ -1053,14 +1053,20 @@ if __name__ == '__main__':
     print("All dependencies loaded successfully")
     print("Watermark removal algorithms ready")
     print("Document processor ready")
-    print("\nServer will start at: http://localhost:5000")
+    
+    # Get port from environment variable (for Railway/Heroku)
+    port = int(os.environ.get('PORT', 5000))
+    
+    print(f"\nServer will start at: http://localhost:{port}")
     print("Two sections: English (text) and Math (LaTeX)")
-    print("Health check at: http://localhost:5000/health")
+    print("Health check at: http://localhost:{port}/health")
     print("Press Ctrl+C to stop the server")
     print("\n" + "="*60)
     
     try:
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        # Use 0.0.0.0 for Railway, localhost for local development
+        host = '0.0.0.0' if os.environ.get('RAILWAY_ENVIRONMENT') else 'localhost'
+        app.run(debug=False, host=host, port=port)
     except KeyboardInterrupt:
         print("\nServer stopped by user")
     except Exception as e:

@@ -10,3 +10,6 @@ Flask-CORS==4.0.0
 
 # Utilities
 Werkzeug==3.0.1
+
+# Additional dependencies for Railway
+gunicorn==21.2.0
