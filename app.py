@@ -700,6 +700,15 @@ class DocumentProcessor:
 processor = DocumentProcessor()
 
 @app.route('/')
+def root():
+    """Simple root endpoint for Railway health checks"""
+    return jsonify({
+        'status': 'ok',
+        'message': 'PDF Watermark Remover is running',
+        'service': 'PDF Watermark Remover - Two Sections'
+    })
+
+@app.route('/home')
 def home():
     """Simple home page with two sections"""
     html_content = """
