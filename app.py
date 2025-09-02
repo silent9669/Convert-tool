@@ -25,7 +25,7 @@ if sys.version_info < (3, 11):
 print(f"Python {sys.version} detected - proceeding with installation...")
 
 try:
-    from flask import Flask, request, jsonify, send_file, render_template_string
+    from flask import Flask, request, jsonify, send_file, render_template_string, redirect
     from flask_cors import CORS
     from werkzeug.utils import secure_filename
     import fitz  # PyMuPDF
@@ -709,12 +709,8 @@ def get_processor():
 
 @app.route('/')
 def root():
-    """Simple root endpoint for Railway health checks"""
-    return jsonify({
-        'status': 'ok',
-        'message': 'PDF Watermark Remover is running',
-        'service': 'PDF Watermark Remover - Two Sections'
-    })
+    """Root endpoint - redirect to home page for web interface"""
+    return redirect('/home')
 
 @app.route('/startup')
 def startup():
