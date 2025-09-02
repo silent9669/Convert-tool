@@ -196,7 +196,7 @@ async function removeWatermark(imageData) {
             
             ctx.drawImage(img, 0, 0);
             
-            // Simple watermark removal algorithm
+            // Enhanced watermark removal algorithm
             const imageDataObj = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const data = imageDataObj.data;
             
@@ -206,23 +206,40 @@ async function removeWatermark(imageData) {
                 const g = data[i + 1];
                 const b = data[i + 2];
                 
-                // Remove semi-transparent watermarks
-                if (alpha < 200 && alpha > 50) {
+                // Remove semi-transparent watermarks (common in scanned documents)
+                if (alpha < 200 && alpha > 30) {
                     data[i + 3] = 0;
                 }
                 
-                // Remove light watermark text (common in scanned documents)
-                if (r > 180 && g > 180 && b > 180) {
+                // Remove light watermark text (very light gray/white text)
+                if (r > 200 && g > 200 && b > 200 && alpha > 100) {
                     data[i] = 255;
                     data[i + 1] = 255;
                     data[i + 2] = 255;
+                    data[i + 3] = 255;
+                }
+                
+                // Remove medium-light watermarks
+                if (r > 180 && g > 180 && b > 180 && alpha > 80) {
+                    data[i] = 255;
+                    data[i + 1] = 255;
+                    data[i + 2] = 255;
+                    data[i + 3] = 255;
                 }
                 
                 // Enhance contrast for better OCR
-                if (r < 128 && g < 128 && b < 128) {
+                if (r < 150 && g < 150 && b < 150) {
                     data[i] = 0;
                     data[i + 1] = 0;
                     data[i + 2] = 0;
+                    data[i + 3] = 255;
+                }
+                
+                // Remove colored watermarks (red, blue, green tints)
+                if (Math.abs(r - g) > 50 || Math.abs(r - b) > 50 || Math.abs(g - b) > 50) {
+                    if (alpha < 180) {
+                        data[i + 3] = 0;
+                    }
                 }
             }
             
@@ -341,92 +358,44 @@ function hideMessages() {
 }
 
 function downloadResult() {
-    // Create a Word-like document using HTML with proper formatting
-    const content = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <meta charset="UTF-8">
-            <title>Converted Document</title>
-            <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/katex/0.16.8/katex.min.css">
-            <style>
-                body { 
-                    font-family: 'Times New Roman', serif; 
-                    padding: 40px; 
-                    line-height: 1.6; 
-                    max-width: 800px;
-                    margin: 0 auto;
-                    background: white;
-                }
-                h1 { 
-                    color: #333; 
-                    border-bottom: 2px solid #4CAF50; 
-                    padding-bottom: 10px; 
-                    margin-bottom: 30px;
-                }
-                pre { 
-                    background: #f8f9fa; 
-                    padding: 20px; 
-                    border-radius: 8px; 
-                    white-space: pre-wrap; 
-                    border-left: 4px solid #4CAF50;
-                    font-family: 'Courier New', monospace;
-                    font-size: 14px;
-                    line-height: 1.5;
-                }
-                .math { 
-                    text-align: center; 
-                    margin: 20px 0; 
-                    padding: 10px;
-                    background: #f0f8ff;
-                    border-radius: 5px;
-                }
-                .file-separator {
-                    border-top: 2px solid #e0e0e0;
-                    margin: 30px 0;
-                    padding-top: 20px;
-                }
-                .file-header {
-                    background: #4CAF50;
-                    color: white;
-                    padding: 10px 20px;
-                    border-radius: 5px;
-                    margin-bottom: 20px;
-                    font-weight: bold;
-                }
-            </style>
-        </head>
-        <body>
-            <h1>📄 Converted Document</h1>
-            <div class="content">
-                ${processedContent.split('---').map((section, index) => {
-                    if (index === 0) return section;
-                    const parts = section.split('\n');
-                    const fileName = parts[0].trim();
-                    const content = parts.slice(1).join('\n').trim();
-                    
-                    if (fileName && content) {
-                        return `
-                            <div class="file-separator">
-                                <div class="file-header">📁 ${fileName}</div>
-                                <pre>${content}</pre>
-                            </div>
-                        `;
-                    }
-                    return '';
-                }).join('')}
-            </div>
-        </body>
-        </html>
-    `;
+    // Create Word document content using DOCX format
+    const content = createWordDocument(processedContent);
     
-    const blob = new Blob([content], { type: 'text/html' });
+    // Create and download the file
+    const blob = new Blob([content], { 
+        type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'converted_document.html';
+    a.download = 'converted_document.docx';
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
+}
+
+function createWordDocument(content) {
+    // Create a simple Word document structure
+    // This is a basic implementation - for production use, consider using a library like docx.js
+    
+    const sections = content.split('---').map((section, index) => {
+        if (index === 0) return section;
+        const parts = section.split('\n');
+        const fileName = parts[0].trim();
+        const textContent = parts.slice(1).join('\n').trim();
+        
+        if (fileName && textContent) {
+            return `\n\n${fileName}\n${'='.repeat(fileName.length)}\n\n${textContent}`;
+        }
+        return '';
+    }).join('');
+    
+    // Convert to Word-compatible format
+    // For now, we'll create a rich text format that Word can open
+    const wordContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}
+\\f0\\fs24 ${sections.replace(/\n/g, '\\par ').replace(/\t/g, '\\tab ')}
+}`;
+    
+    return wordContent;
 }
