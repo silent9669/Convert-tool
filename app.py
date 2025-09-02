@@ -104,7 +104,10 @@ class EnhancedWatermarkRemover:
             r'UNCLASSIFIED',
             r'PUBLIC RELEASE',
             r'APPROVED FOR RELEASE',
-            r'REVIEWED AND APPROVED'
+            r'REVIEWED AND APPROVED',
+            # Specific watermarks from user's document
+            r'VietAcc',
+            r'VIETACC'
         ]
         
         # Visual watermark detection patterns
@@ -318,23 +321,11 @@ class DocumentProcessor:
         try:
             logger.info(f"Processing {file_path} with section type: {section_type}")
             
-            # Step 1: Remove watermarks
-            cleaned_pdf_path = os.path.join(PROCESSED_FOLDER, f"cleaned_{Path(file_path).name}")
-            if not self.watermark_remover.remove_watermarks_from_pdf(file_path, cleaned_pdf_path):
-                raise Exception("Watermark removal failed")
-            
-            # Step 2: Extract text and convert to Word based on section type
+            # Direct conversion from original PDF with watermark removal in text processing
             if section_type == 'math':
-                word_path = self._convert_to_word_math(cleaned_pdf_path, file_path)
+                word_path = self._convert_to_word_math(file_path, file_path)
             else:
-                word_path = self._convert_to_word_english(cleaned_pdf_path, file_path)
-            
-            # Clean up intermediate files
-            try:
-                os.remove(cleaned_pdf_path)
-                logger.info("Cleaned up intermediate files")
-            except:
-                pass
+                word_path = self._convert_to_word_english(file_path, file_path)
             
             metadata = {
                 'success': True,
@@ -393,6 +384,9 @@ class DocumentProcessor:
                 
                 # Extract text from page
                 text = page.get_text()
+                
+                # Remove watermarks from text
+                text = self.watermark_remover._remove_watermarks_enhanced(text)
                 
                 # Clean up text for English section
                 text = self._clean_text_english(text)
@@ -478,6 +472,9 @@ class DocumentProcessor:
                 
                 # Extract text from page
                 text = page.get_text()
+                
+                # Remove watermarks from text
+                text = self.watermark_remover._remove_watermarks_enhanced(text)
                 
                 # Convert math expressions to LaTeX
                 text = self._convert_math_to_latex(text)
