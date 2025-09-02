@@ -35,17 +35,8 @@ tmp
 Thumbs.db
 Desktop.ini
 
-# Documentation
-*.md
-LICENSE
-DEPLOY.md
-
 # Large files
 *.pdf
 *.docx
 *.zip
 *.tar.gz
-
-# Railway
-.railwayignore
-railway.json

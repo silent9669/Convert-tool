@@ -47,16 +47,12 @@ ehthumbs.db
 Thumbs.db
 Desktop.ini
 
-# Test files and documentation
+# Test files
 test_*.py
 *_test.py
 tests/
 test/
 *.test.py
-DEPLOY.md
-README.md
-LICENSE
-*.md
 
 # Large binary files
 *.pdf
@@ -76,7 +72,3 @@ yarn-error.log*
 # Docker
 Dockerfile*
 docker-compose*
-.dockerignore
-
-# Railway specific
-railway.json
