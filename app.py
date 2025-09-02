@@ -49,6 +49,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Production logging optimization
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    logger.setLevel(logging.WARNING)  # Reduce log noise in production
+
 app = Flask(__name__)
 CORS(app)
 
@@ -526,6 +530,31 @@ class DocumentProcessor:
         """Enhanced math to LaTeX conversion inspired by LaTeX-OCR repository"""
         # Advanced math conversion patterns
         conversions = [
+            # Greek letters (process first to avoid conflicts)
+            (r'\balpha\b', r'\\alpha'),
+            (r'\bbeta\b', r'\\beta'),
+            (r'\bgamma\b', r'\\gamma'),
+            (r'\bdelta\b', r'\\delta'),
+            (r'\bepsilon\b', r'\\epsilon'),
+            (r'\bzeta\b', r'\\zeta'),
+            (r'\beta\b', r'\\beta'),
+            (r'\btheta\b', r'\\theta'),
+            (r'\biota\b', r'\\iota'),
+            (r'\bkappa\b', r'\\kappa'),
+            (r'\blambda\b', r'\\lambda'),
+            (r'\bmu\b', r'\\mu'),
+            (r'\bnu\b', r'\\nu'),
+            (r'\bxi\b', r'\\xi'),
+            (r'\bpi\b', r'\\pi'),
+            (r'\brho\b', r'\\rho'),
+            (r'\bsigma\b', r'\\sigma'),
+            (r'\btau\b', r'\\tau'),
+            (r'\bupsilon\b', r'\\upsilon'),
+            (r'\bphi\b', r'\\phi'),
+            (r'\bchi\b', r'\\chi'),
+            (r'\bpsi\b', r'\\psi'),
+            (r'\bomega\b', r'\\omega'),
+            
             # Fractions and ratios
             (r'(\w+)/(\w+)', r'\\frac{\1}{\2}'),
             (r'(\d+)/(\d+)', r'\\frac{\1}{\2}'),
@@ -540,31 +569,6 @@ class DocumentProcessor:
             (r'√\(([^)]+)\)', r'\\sqrt{\1}'),
             (r'cbrt\(([^)]+)\)', r'\\sqrt[3]{\1}'),
             (r'root\(([^)]+)\)', r'\\sqrt{\1}'),
-            
-            # Greek letters
-            (r'alpha', r'\\alpha'),
-            (r'beta', r'\\beta'),
-            (r'gamma', r'\\gamma'),
-            (r'delta', r'\\delta'),
-            (r'epsilon', r'\\epsilon'),
-            (r'zeta', r'\\zeta'),
-            (r'eta', r'\\eta'),
-            (r'theta', r'\\theta'),
-            (r'iota', r'\\iota'),
-            (r'kappa', r'\\kappa'),
-            (r'lambda', r'\\lambda'),
-            (r'mu', r'\\mu'),
-            (r'nu', r'\\nu'),
-            (r'xi', r'\\xi'),
-            (r'pi', r'\\pi'),
-            (r'rho', r'\\rho'),
-            (r'sigma', r'\\sigma'),
-            (r'tau', r'\\tau'),
-            (r'upsilon', r'\\upsilon'),
-            (r'phi', r'\\phi'),
-            (r'chi', r'\\chi'),
-            (r'psi', r'\\psi'),
-            (r'omega', r'\\omega'),
             
             # Mathematical operators
             (r'integral', r'\\int'),
@@ -637,11 +641,11 @@ class DocumentProcessor:
         # Enhanced LaTeX expression detection and wrapping
         # Look for LaTeX commands and wrap them properly
         latex_patterns = [
-            (r'\\[a-zA-Z]+(\{[^}]*\})?', r'$$\\\g<0>$$'),  # Basic LaTeX commands
-            (r'\\frac\{[^}]*\}\{[^}]*\}', r'$$\\\g<0>$$'),  # Fractions
-            (r'\\sqrt\{[^}]*\}', r'$$\\\g<0>$$'),  # Square roots
-            (r'\\int[^$]*', r'$$\\\g<0>$$'),  # Integrals
-            (r'\\sum[^$]*', r'$$\\\g<0>$$'),  # Sums
+            (r'\\[a-zA-Z]+(\{[^}]*\})?', r'$$\g<0>$$'),  # Basic LaTeX commands
+            (r'\\frac\{[^}]*\}\{[^}]*\}', r'$$\g<0>$$'),  # Fractions
+            (r'\\sqrt\{[^}]*\}', r'$$\g<0>$$'),  # Square roots
+            (r'\\int[^$]*', r'$$\g<0>$$'),  # Integrals
+            (r'\\sum[^$]*', r'$$\g<0>$$'),  # Sums
         ]
         
         for pattern, replacement in latex_patterns:
@@ -1228,6 +1232,21 @@ def allowed_file(filename):
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# Error handlers for production
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    logger.error(f"Internal server error: {error}")
+    return jsonify({'error': 'Internal server error'}), 500
+
+@app.errorhandler(Exception)
+def handle_exception(e):
+    logger.error(f"Unhandled exception: {str(e)}")
+    return jsonify({'error': 'An unexpected error occurred'}), 500
+
 if __name__ == '__main__':
     print("Starting PDF Watermark Remover - Two Sections...")
     print(f"Python {sys.version} detected")
@@ -1238,16 +1257,36 @@ if __name__ == '__main__':
     # Get port from environment variable (for Railway/Heroku)
     port = int(os.environ.get('PORT', 5000))
     
-    print(f"\nServer will start at: http://localhost:{port}")
+    # Production optimizations for Railway
+    is_production = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL')
+    
+    if is_production:
+        print("🚀 Production mode detected - Railway deployment")
+        host = '0.0.0.0'
+        debug = False
+        threaded = True
+    else:
+        print("🔧 Development mode detected - Local testing")
+        host = 'localhost'
+        debug = True
+        threaded = False
+    
+    print(f"\nServer will start at: http://{host}:{port}")
     print("Two sections: English (text) and Math (LaTeX)")
-    print("Health check at: http://localhost:{port}/health")
+    print("Health check at: http://{host}:{port}/health")
+    print(f"Production mode: {is_production}")
+    print(f"Debug mode: {debug}")
+    print(f"Threaded: {threaded}")
     print("Press Ctrl+C to stop the server")
     print("\n" + "="*60)
     
     try:
-        # Use 0.0.0.0 for Railway, localhost for local development
-        host = '0.0.0.0' if os.environ.get('RAILWAY_ENVIRONMENT') else 'localhost'
-        app.run(debug=False, host=host, port=port)
+        app.run(
+            debug=debug, 
+            host=host, 
+            port=port,
+            threaded=threaded
+        )
     except KeyboardInterrupt:
         print("\nServer stopped by user")
     except Exception as e:
