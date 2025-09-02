@@ -1,33 +1,82 @@
-# Git files
+# Git and version control
 .git/
 .gitignore
+.gitattributes
 
-# Python cache
+# Python cache and compiled files
 __pycache__/
 *.pyc
 *.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.egg-info/
 
-# Logs
-*.log
-
-# Environment files
-.env
-.venv/
+# Virtual environments
 venv/
+env/
+.venv/
+.env/
+ENV/
 
-# IDE files
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+logs/
+temp/
+tmp/
+
+# IDE and editor files
 .vscode/
 .idea/
+*.swp
+*.swo
+*~
 
-# OS files
+# OS generated files
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+Desktop.ini
 
-# Test files
+# Test files and documentation
 test_*.py
 *_test.py
-
-# Documentation
+tests/
+test/
+*.test.py
 DEPLOY.md
 README.md
 LICENSE
+*.md
+
+# Large binary files
+*.pdf
+*.docx
+*.doc
+*.xlsx
+*.zip
+*.tar.gz
+*.rar
+
+# Node.js (if any)
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Docker
+Dockerfile*
+docker-compose*
+.dockerignore
+
+# Railway specific
+railway.json
