@@ -637,11 +637,11 @@ class DocumentProcessor:
         # Enhanced LaTeX expression detection and wrapping
         # Look for LaTeX commands and wrap them properly
         latex_patterns = [
-            (r'\\[a-zA-Z]+(\{[^}]*\})?', r'$$\1$$'),  # Basic LaTeX commands
-            (r'\\frac\{[^}]*\}\{[^}]*\}', r'$$\1$$'),  # Fractions
-            (r'\\sqrt\{[^}]*\}', r'$$\1$$'),  # Square roots
-            (r'\\int[^$]*', r'$$\1$$'),  # Integrals
-            (r'\\sum[^$]*', r'$$\1$$'),  # Sums
+            (r'\\[a-zA-Z]+(\{[^}]*\})?', r'$$\\\g<0>$$'),  # Basic LaTeX commands
+            (r'\\frac\{[^}]*\}\{[^}]*\}', r'$$\\\g<0>$$'),  # Fractions
+            (r'\\sqrt\{[^}]*\}', r'$$\\\g<0>$$'),  # Square roots
+            (r'\\int[^$]*', r'$$\\\g<0>$$'),  # Integrals
+            (r'\\sum[^$]*', r'$$\\\g<0>$$'),  # Sums
         ]
         
         for pattern, replacement in latex_patterns:
