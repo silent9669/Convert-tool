@@ -1,4 +1,4 @@
-# Core PDF Processing
+# Core PDF Processing (lighter alternative)
 PyMuPDF==1.23.26
 
 # Word Document Generation
@@ -14,17 +14,13 @@ Werkzeug==3.0.1
 # Railway Production Server
 gunicorn==21.2.0
 
-# Enhanced Image Processing (for watermark detection)
-opencv-python==4.8.1.78
-numpy==1.24.3
+# Lightweight image processing (replacing heavy opencv)
+Pillow==10.0.1
 
-# Additional dependencies for Railway
+# Core dependencies only
 lxml==4.9.3
 Jinja2==3.1.2
 itsdangerous==2.1.2
 click==8.1.7
 blinker==1.6.3
 MarkupSafe==2.1.3
-
-# Production dependencies
-requests==2.32.5

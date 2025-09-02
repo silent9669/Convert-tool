@@ -14,8 +14,8 @@ from pathlib import Path
 from typing import List, Dict, Tuple, Optional
 import time
 import re
-import cv2
-import numpy as np
+from PIL import Image
+import io
 
 # Check Python version
 if sys.version_info < (3, 11):
