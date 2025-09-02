@@ -750,6 +750,15 @@ def ready():
             'error': str(e)
         }), 503
 
+@app.route('/live')
+def live():
+    """Liveness probe for Railway - responds immediately"""
+    return jsonify({
+        'status': 'alive',
+        'message': 'Application is running',
+        'timestamp': time.time()
+    })
+
 @app.route('/home')
 def home():
     """Simple home page with two sections"""
