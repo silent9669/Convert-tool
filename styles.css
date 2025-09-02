@@ -19,7 +19,7 @@ body {
     border-radius: 20px;
     box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
     padding: 40px;
-    max-width: 600px;
+    max-width: 700px;
     width: 100%;
     text-align: center;
 }
@@ -32,8 +32,105 @@ h1 {
 
 .subtitle {
     color: #666;
-    margin-bottom: 40px;
+    margin-bottom: 30px;
     font-size: 1.1em;
+}
+
+/* Section Tabs */
+.section-tabs {
+    display: flex;
+    justify-content: center;
+    margin-bottom: 30px;
+    background: #f8f9fa;
+    border-radius: 15px;
+    padding: 5px;
+    gap: 5px;
+}
+
+.tab-btn {
+    background: transparent;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 1em;
+    font-weight: 500;
+    color: #666;
+    transition: all 0.3s ease;
+    flex: 1;
+    max-width: 200px;
+}
+
+.tab-btn.active {
+    background: #4CAF50;
+    color: white;
+    box-shadow: 0 4px 15px rgba(76, 175, 80, 0.3);
+}
+
+.tab-btn:hover:not(.active) {
+    background: #e9ecef;
+    color: #333;
+}
+
+/* Section Content */
+.section-content {
+    display: none;
+    margin-bottom: 30px;
+    text-align: left;
+}
+
+.section-content.active {
+    display: block;
+}
+
+.section-header {
+    background: #f8f9fa;
+    padding: 20px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+    border-left: 4px solid #4CAF50;
+}
+
+.section-header h3 {
+    color: #333;
+    margin-bottom: 8px;
+    font-size: 1.3em;
+}
+
+.section-header p {
+    color: #666;
+    font-size: 0.95em;
+    margin: 0;
+}
+
+/* Language Selector */
+.language-selector {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 20px;
+}
+
+.language-selector label {
+    font-weight: 500;
+    color: #333;
+    min-width: 120px;
+}
+
+.language-selector select {
+    padding: 8px 12px;
+    border: 2px solid #e9ecef;
+    border-radius: 8px;
+    font-size: 0.9em;
+    background: white;
+    color: #333;
+    cursor: pointer;
+    transition: border-color 0.3s ease;
+}
+
+.language-selector select:focus {
+    outline: none;
+    border-color: #4CAF50;
 }
 
 .drop-zone {
@@ -199,5 +296,20 @@ h1 {
     
     .drop-zone {
         padding: 40px 15px;
+    }
+    
+    .section-tabs {
+        flex-direction: column;
+        gap: 3px;
+    }
+    
+    .tab-btn {
+        max-width: none;
+    }
+    
+    .language-selector {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
     }
 }

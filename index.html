@@ -15,6 +15,55 @@
         <h1>📄 PDF/Image to Word</h1>
         <p class="subtitle">Convert documents with OCR, Math recognition & Watermark removal</p>
 
+        <!-- Section Tabs -->
+        <div class="section-tabs">
+            <button class="tab-btn active" data-section="english">🇺🇸 English Section</button>
+            <button class="tab-btn" data-section="math">🧮 Math Section</button>
+        </div>
+
+        <!-- English Section -->
+        <div class="section-content active" id="englishSection">
+            <div class="section-header">
+                <h3>📝 Text Processing & Watermark Removal</h3>
+                <p>Optimized for text documents with advanced watermark removal</p>
+            </div>
+            
+            <div class="language-selector">
+                <label for="englishLanguage">Primary Language:</label>
+                <select id="englishLanguage">
+                    <option value="eng">English (eng)</option>
+                    <option value="fra">French (fra)</option>
+                    <option value="deu">German (deu)</option>
+                    <option value="spa">Spanish (spa)</option>
+                    <option value="ita">Italian (ita)</option>
+                    <option value="por">Portuguese (por)</option>
+                    <option value="rus">Russian (rus)</option>
+                    <option value="chi_sim">Chinese Simplified (chi_sim)</option>
+                    <option value="jpn">Japanese (jpn)</option>
+                    <option value="kor">Korean (kor)</option>
+                </select>
+            </div>
+        </div>
+
+        <!-- Math Section -->
+        <div class="section-content" id="mathSection">
+            <div class="section-header">
+                <h3>🔢 Mathematical Expression Processing</h3>
+                <p>Specialized for documents with mathematical formulas and equations</p>
+            </div>
+            
+            <div class="language-selector">
+                <label for="mathLanguage">Primary Language:</label>
+                <select id="mathLanguage">
+                    <option value="eng">English (eng)</option>
+                    <option value="fra">French (fra)</option>
+                    <option value="deu">German (deu)</option>
+                    <option value="spa">Spanish (spa)</option>
+                    <option value="chi_sim">Chinese Simplified (chi_sim)</option>
+                </select>
+            </div>
+        </div>
+
         <div class="drop-zone" id="dropZone">
             <div class="drop-icon">☁️</div>
             <div class="drop-text">Drop files here or click to browse</div>

@@ -1,5 +1,6 @@
 let selectedFiles = [];
 let processedContent = '';
+let currentSection = 'english';
 
 // Elements
 const dropZone = document.getElementById('dropZone');
@@ -13,10 +14,24 @@ const successMessage = document.getElementById('successMessage');
 const errorMessage = document.getElementById('errorMessage');
 const downloadBtn = document.getElementById('downloadBtn');
 
+// Tab elements
+const tabBtns = document.querySelectorAll('.tab-btn');
+const englishSection = document.getElementById('englishSection');
+const mathSection = document.getElementById('mathSection');
+
+// Language selectors
+const englishLanguage = document.getElementById('englishLanguage');
+const mathLanguage = document.getElementById('mathLanguage');
+
 // Event listeners
 dropZone.addEventListener('click', () => fileInput.click());
 fileInput.addEventListener('change', handleFileSelect);
 downloadBtn.addEventListener('click', downloadResult);
+
+// Tab switching
+tabBtns.forEach(btn => {
+    btn.addEventListener('click', () => switchSection(btn.dataset.section));
+});
 
 // Drag and drop events
 ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
@@ -30,6 +45,24 @@ dropZone.addEventListener('drop', handleDrop);
 function preventDefaults(e) {
     e.preventDefault();
     e.stopPropagation();
+}
+
+function switchSection(section) {
+    currentSection = section;
+    
+    // Update tab buttons
+    tabBtns.forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.section === section);
+    });
+    
+    // Update section content
+    englishSection.classList.toggle('active', section === 'english');
+    mathSection.classList.toggle('active', section === 'math');
+    
+    // Reset UI
+    hideMessages();
+    selectedFilesDiv.style.display = 'none';
+    progressSection.style.display = 'none';
 }
 
 function handleDrop(e) {
@@ -115,17 +148,23 @@ async function processFile(file) {
         imageData = await fileToImageData(file);
     }
     
-    // Remove watermarks
+    // Remove watermarks based on section
     updateProgress(null, 'Removing watermarks...');
     const cleanImage = await removeWatermark(imageData);
     
-    // Perform OCR
+    // Perform OCR with selected language
     updateProgress(null, 'Extracting text...');
     const ocrText = await performOCR(cleanImage);
     
-    // Convert math expressions
-    updateProgress(null, 'Converting math expressions...');
-    const finalText = convertMathToKaTeX(ocrText);
+    // Process content based on section
+    updateProgress(null, 'Processing content...');
+    let finalText;
+    
+    if (currentSection === 'math') {
+        finalText = processMathContent(ocrText);
+    } else {
+        finalText = processEnglishContent(ocrText);
+    }
     
     return finalText;
 }
@@ -144,7 +183,6 @@ async function processPDF(file) {
         
         // For demo purposes, we'll create a placeholder image
         // In a production environment, you'd use pdf2pic or similar library
-        // to convert PDF pages to images
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         canvas.width = 800;
@@ -252,25 +290,75 @@ async function removeWatermark(imageData) {
 
 async function performOCR(imageData) {
     try {
-        const result = await Tesseract.recognize(imageData, 'eng', {
-            logger: m => {
-                if (m.status === 'recognizing text') {
-                    const ocrProgress = Math.round(m.progress * 100);
-                    updateProgress(50 + (ocrProgress * 0.4), `OCR: ${ocrProgress}%`);
-                }
-            }
-        });
+        // Get selected language based on current section
+        const language = currentSection === 'math' ? mathLanguage.value : englishLanguage.value;
         
-        return result.data.text;
+        // Use multiple languages for better accuracy
+        const languages = [language];
+        
+        // Add English as fallback for better math recognition
+        if (currentSection === 'math' && language !== 'eng') {
+            languages.push('eng');
+        }
+        
+        let bestResult = '';
+        let bestConfidence = 0;
+        
+        for (const lang of languages) {
+            try {
+                const result = await Tesseract.recognize(imageData, lang, {
+                    logger: m => {
+                        if (m.status === 'recognizing text') {
+                            const ocrProgress = Math.round(m.progress * 100);
+                            updateProgress(50 + (ocrProgress * 0.4), `OCR (${lang}): ${ocrProgress}%`);
+                        }
+                    }
+                });
+                
+                // Use result with highest confidence
+                if (result.data.confidence > bestConfidence) {
+                    bestResult = result.data.text;
+                    bestConfidence = result.data.confidence;
+                }
+            } catch (error) {
+                console.warn(`OCR failed for language ${lang}:`, error);
+            }
+        }
+        
+        if (!bestResult) {
+            throw new Error('OCR failed for all languages');
+        }
+        
+        return bestResult;
     } catch (error) {
         throw new Error('OCR failed: ' + error.message);
     }
 }
 
-function convertMathToKaTeX(text) {
+function processEnglishContent(text) {
+    // For English section, focus on text preservation and formatting
     let processedText = text;
     
-    // Math conversion patterns for common mathematical expressions
+    // Clean up common OCR artifacts
+    processedText = processedText
+        .replace(/\|\|/g, 'll')  // Common OCR mistake
+        .replace(/\|\//g, 'll')  // Another common mistake
+        .replace(/[0O](\d)/g, '0$1')  // Fix number recognition
+        .replace(/(\d)[0O]/g, '$10');  // Fix number recognition
+    
+    // Preserve paragraph structure
+    processedText = processedText
+        .replace(/\n{3,}/g, '\n\n')  // Normalize multiple newlines
+        .trim();
+    
+    return processedText;
+}
+
+function processMathContent(text) {
+    // For Math section, focus on mathematical expression recognition
+    let processedText = text;
+    
+    // Enhanced math conversion patterns
     const conversions = [
         // Fractions
         [/(\w+)\/(\w+)/g, '\\frac{$1}{$2}'],
@@ -317,6 +405,12 @@ function convertMathToKaTeX(text) {
         // Subscripts
         [/(\w+)_(\w+)/g, '$1_{$2}'],
         [/(\w+)_(\d+)/g, '$1_{$2}'],
+        
+        // Matrix notation
+        [/\[([^\]]+)\]/g, '\\begin{bmatrix} $1 \\end{bmatrix}'],
+        
+        // Function notation
+        [/(\w+)\(([^)]+)\)/g, '\\text{$1}($2)'],
     ];
     
     conversions.forEach(([pattern, replacement]) => {
@@ -358,7 +452,7 @@ function hideMessages() {
 }
 
 function downloadResult() {
-    // Create Word document content using DOCX format
+    // Create Word document content
     const content = createWordDocument(processedContent);
     
     // Create and download the file
@@ -368,7 +462,7 @@ function downloadResult() {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'converted_document.docx';
+    a.download = `converted_document_${currentSection}.docx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -376,9 +470,7 @@ function downloadResult() {
 }
 
 function createWordDocument(content) {
-    // Create a simple Word document structure
-    // This is a basic implementation - for production use, consider using a library like docx.js
-    
+    // Create a more sophisticated Word document structure
     const sections = content.split('---').map((section, index) => {
         if (index === 0) return section;
         const parts = section.split('\n');
@@ -391,11 +483,23 @@ function createWordDocument(content) {
         return '';
     }).join('');
     
-    // Convert to Word-compatible format
-    // For now, we'll create a rich text format that Word can open
-    const wordContent = `{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}
-\\f0\\fs24 ${sections.replace(/\n/g, '\\par ').replace(/\t/g, '\\tab ')}
-}`;
+    // Create RTF content with better formatting
+    let rtfContent = '{\\rtf1\\ansi\\deff0 {\\fonttbl {\\f0 Times New Roman;}}';
     
-    return wordContent;
+    // Add section-specific formatting
+    if (currentSection === 'math') {
+        rtfContent += '\\f0\\fs24\\b Math Document\\b0\\par\\par';
+    } else {
+        rtfContent += '\\f0\\fs24\\b Text Document\\b0\\par\\par';
+    }
+    
+    // Process content with proper formatting
+    const formattedContent = sections
+        .replace(/\n/g, '\\par ')
+        .replace(/\t/g, '\\tab ')
+        .replace(/\$\$([^$]+)\$\$/g, '\\i $1\\i0 '); // Format math expressions
+    
+    rtfContent += formattedContent + '}';
+    
+    return rtfContent;
 }
