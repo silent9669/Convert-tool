@@ -1770,7 +1770,7 @@ class DocumentProcessor:
         """Detect if document is SAT format"""
         try:
             # Quick check of first few pages for SAT indicators
-            text = self.watermark_remover._extract_text_enhanced(file_path, max_pages=3)
+            text = self.watermark_remover.extract_text_from_pdf(file_path, max_pages=3)
             return self._is_sat_document_from_text(text)
             
         except Exception as e:
