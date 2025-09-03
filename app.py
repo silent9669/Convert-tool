@@ -170,7 +170,7 @@ class EnhancedWatermarkRemover:
             
             # Configure Gemini
             genai.configure(api_key=self.ai_api_keys.get('gemini'))
-            model = genai.GenerativeModel('gemini-1.5-pro')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             # Create prompt for watermark analysis
             prompt = f"""
@@ -325,7 +325,7 @@ class EnhancedWatermarkRemover:
             # Use Gemini API
             import google.generativeai as genai
             genai.configure(api_key=self.ai_api_keys['gemini'])
-            model = genai.GenerativeModel('gemini-1.5-pro')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             response = model.generate_content(prompt)
             cleaned_text = response.text
@@ -1159,7 +1159,7 @@ class SATDocumentProcessor:
             # Use Gemini API
             import google.generativeai as genai
             genai.configure(api_key=self.watermark_remover.ai_api_keys['gemini'])
-            model = genai.GenerativeModel('gemini-1.5-pro')
+            model = genai.GenerativeModel('gemini-2.5-flash')
             
             response = model.generate_content(prompt)
             ai_response = response.text
@@ -1419,44 +1419,41 @@ class SATDocumentProcessor:
         return False
     
     def _format_sat_for_word(self, text: str, structure: Dict) -> str:
-        """Format SAT content for Word document with proper structure"""
+        """Format SAT content for Word document with simplified structure"""
         formatted_lines = []
         
-        # Add title
-        formatted_lines.append("SAT Practice Test")
-        formatted_lines.append("=" * 50)
-        formatted_lines.append("")
-        
-        # Process sections
-        for section in structure['sections']:
-            formatted_lines.append(f"**SECTION_HEADER:{section['text']}**")
-            formatted_lines.append("")
-        
-        # Process reading passages with proper structure
-        for passage in structure['reading_passages']:
-            formatted_lines.append(f"**READING_PASSAGE:{passage['text']}**")
-            formatted_lines.append("")
-            
-            if 'content' in passage:
-                for line in passage['content']:
-                    formatted_lines.append(f"PASSAGE_CONTENT:{line}")
-                formatted_lines.append("")
-        
-        # Process questions with proper structure
+        # Process questions with simplified format
+        question_number = 1
         for question in structure['questions']:
-            formatted_lines.append(f"**QUESTION:{question['text']}**")
+            # Add question number separator
+            formatted_lines.append(f"-question number {question_number}")
+            formatted_lines.append("")
             
-            # Add question content if any
+            # Add reading passage content (if any)
+            if 'passage_content' in question and question['passage_content']:
+                formatted_lines.append("+reading passage")
+                for line in question['passage_content']:
+                    formatted_lines.append(line)
+                formatted_lines.append("")
+            
+            # Add question text
+            formatted_lines.append("+question text")
             if 'content' in question:
                 for line in question['content']:
-                    formatted_lines.append(f"QUESTION_CONTENT:{line}")
+                    formatted_lines.append(line)
+            formatted_lines.append("")
             
-            # Add multiple choice options with proper formatting
+            # Add multiple choice options
             if question['choices']:
-                formatted_lines.append("")
+                formatted_lines.append("+multiple choice")
                 for choice in question['choices']:
-                    formatted_lines.append(f"MULTIPLE_CHOICE:{choice['text']}")
+                    formatted_lines.append(choice['text'])
                 formatted_lines.append("")
+            
+            # Add spacing between questions
+            formatted_lines.append("")
+            formatted_lines.append("")
+            question_number += 1
         
         return '\n'.join(formatted_lines)
     
@@ -1616,59 +1613,44 @@ class SATDocumentProcessor:
         """Format SAT content for Word document with Math section focus (LaTeX conversion)"""
         formatted_lines = []
         
-        # Add document metadata
-        formatted_lines.append(f"- document type : {structure.get('document_type', 'unknown')}")
-        formatted_lines.append(f"+Total Questions: {structure.get('total_questions', 0)}")
-        formatted_lines.append("")
-        
-        # Process reading passages with exact format
-        for passage in structure['reading_passages']:
-            formatted_lines.append("- reading passage :")
-            if 'content' in passage and passage['content']:
-                for line in passage['content']:
+        # Process questions with simplified format
+        question_number = 1
+        for question in structure['questions']:
+            # Add question number separator
+            formatted_lines.append(f"-question number {question_number}")
+            formatted_lines.append("")
+            
+            # Add reading passage content (if any)
+            if 'passage_content' in question and question['passage_content']:
+                formatted_lines.append("+reading passage")
+                for line in question['passage_content']:
                     # Convert math expressions to LaTeX format
                     latex_line = self._convert_math_to_latex(line)
-                    formatted_lines.append(f"+{latex_line}")
-            else:
-                # If no specific content, use the passage text
-                latex_text = self._convert_math_to_latex(passage['text'])
-                formatted_lines.append(f"+{latex_text}")
-            formatted_lines.append("")
-        
-        # Process questions with exact format and enhanced classification
-        for question in structure['questions']:
-            # Add question metadata
-            question_type = question.get('question_type', 'unknown')
-            section_type = question.get('section_type', 'unknown')
-            difficulty = question.get('difficulty', 'medium')
-            topic = question.get('topic', 'general')
+                    formatted_lines.append(latex_line)
+                formatted_lines.append("")
             
-            formatted_lines.append(f"- question type : {question_type}")
-            formatted_lines.append(f"+Section: {section_type}")
-            formatted_lines.append(f"+Difficulty: {difficulty}")
-            formatted_lines.append(f"+Topic: {topic}")
-            formatted_lines.append("")
-            
-            formatted_lines.append("- question:")
-            if 'content' in question and question['content']:
+            # Add question text
+            formatted_lines.append("+question text")
+            if 'content' in question:
                 for line in question['content']:
                     # Convert math expressions to LaTeX format
                     latex_line = self._convert_math_to_latex(line)
-                    formatted_lines.append(f"+{latex_line}")
-            else:
-                # If no specific content, use the question text
-                latex_text = self._convert_math_to_latex(question['text'])
-                formatted_lines.append(f"+{latex_text}")
+                    formatted_lines.append(latex_line)
             formatted_lines.append("")
             
-            # Add multiple choice options with exact format
+            # Add multiple choice options
             if question['choices']:
-                formatted_lines.append("- options")
+                formatted_lines.append("+multiple choice")
                 for choice in question['choices']:
-                    # Convert math expressions in choices to LaTeX format
+                    # Convert math expressions to LaTeX format
                     latex_choice = self._convert_math_to_latex(choice['text'])
-                    formatted_lines.append(f"+{choice['option']}) {latex_choice}")
+                    formatted_lines.append(latex_choice)
                 formatted_lines.append("")
+            
+            # Add spacing between questions
+            formatted_lines.append("")
+            formatted_lines.append("")
+            question_number += 1
         
         return '\n'.join(formatted_lines)
     
@@ -2478,6 +2460,41 @@ def update_api_key():
         logger.error(f"API key update failed: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/feedback', methods=['POST'])
+def submit_feedback():
+    """Submit user feedback for AI training"""
+    try:
+        data = request.get_json()
+        feedback = data.get('feedback', '').strip()
+        timestamp = data.get('timestamp', '')
+        
+        if not feedback:
+            return jsonify({'error': 'Feedback is required'}), 400
+        
+        # Log feedback for AI training
+        logger.info(f"User feedback received: {feedback}")
+        
+        # Store feedback (in a real implementation, you'd save to database)
+        feedback_data = {
+            'feedback': feedback,
+            'timestamp': timestamp,
+            'user_agent': request.headers.get('User-Agent', ''),
+            'ip_address': request.remote_addr
+        }
+        
+        # Here you could save to a database or file for AI training
+        # For now, we'll just log it
+        logger.info(f"Feedback data: {feedback_data}")
+        
+        return jsonify({
+            'message': 'Feedback submitted successfully',
+            'status': 'received'
+        })
+        
+    except Exception as e:
+        logger.error(f"Feedback submission failed: {e}")
+        return jsonify({'error': 'Failed to submit feedback'}), 500
+
 @app.route('/home')
 def home():
     """Simple home page with two sections"""
@@ -2594,6 +2611,59 @@ def home():
 
             .api-key-status.error {
                 color: #721c24;
+            }
+
+            /* Training Section Styles */
+            .training-section {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+                padding: 20px;
+                border-radius: 12px;
+                margin: 20px 0;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            }
+
+            .training-section h3 {
+                margin: 0 0 10px 0;
+                font-size: 18px;
+            }
+
+            .training-section p {
+                margin: 0 0 15px 0;
+                opacity: 0.9;
+            }
+
+            .training-controls {
+                display: flex;
+                gap: 10px;
+                flex-wrap: wrap;
+            }
+
+            .training-btn, .feedback-btn {
+                background: rgba(255, 255, 255, 0.2);
+                color: white;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 14px;
+                font-weight: 600;
+                transition: all 0.3s ease;
+            }
+
+            .training-btn:hover, .feedback-btn:hover {
+                background: rgba(255, 255, 255, 0.3);
+                border-color: rgba(255, 255, 255, 0.5);
+                transform: translateY(-2px);
+            }
+
+            .training-status {
+                margin-top: 15px;
+                padding: 10px;
+                border-radius: 6px;
+                font-size: 14px;
+                text-align: center;
+                background: rgba(255, 255, 255, 0.1);
             }
 
             .sections {
@@ -2776,16 +2846,27 @@ def home():
             <h1>📄 PDF Watermark Remover</h1>
             <p class="subtitle">Two sections: English (text) and Math (LaTeX)</p>
 
-            <!-- API Key Input Section -->
-            <div class="api-key-section">
-                <h3>🔑 AI Enhancement Setup</h3>
-                <p>Enter your Gemini API key for enhanced watermark removal and AI-powered processing:</p>
-                <div class="api-input-group">
-                    <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" class="api-key-input">
-                    <button onclick="updateApiKey()" class="api-key-btn">Set API Key</button>
-                </div>
-                <div id="apiKeyStatus" class="api-key-status"></div>
+                    <!-- API Key Input Section -->
+        <div class="api-key-section">
+            <h3>🔑 AI Enhancement Setup</h3>
+            <p>Enter your Gemini API key for enhanced watermark removal and AI-powered processing:</p>
+            <div class="api-input-group">
+                <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" class="api-key-input">
+                <button onclick="updateApiKey()" class="api-key-btn">Set API Key</button>
             </div>
+            <div id="apiKeyStatus" class="api-key-status"></div>
+        </div>
+
+        <!-- AI Training Section -->
+        <div class="training-section">
+            <h3>🤖 AI Training & Feedback</h3>
+            <p>Help improve the AI by providing feedback on watermark detection and format recognition:</p>
+            <div class="training-controls">
+                <button onclick="startTraining()" class="training-btn">Start AI Training Session</button>
+                <button onclick="provideFeedback()" class="feedback-btn">Provide Feedback</button>
+            </div>
+            <div id="trainingStatus" class="training-status"></div>
+        </div>
 
             <div class="sections">
                 <div class="section" id="englishSection" onclick="selectSection('english')">
@@ -3043,6 +3124,53 @@ def home():
                 setTimeout(() => {
                     apiKeyStatus.textContent = '';
                     apiKeyStatus.className = 'api-key-status';
+                }, 5000);
+            }
+
+            // AI Training Functions
+            function startTraining() {
+                const status = document.getElementById('trainingStatus');
+                status.innerHTML = '🤖 Starting AI training session...<br>Upload a PDF to begin interactive training.';
+                
+                // Enable training mode
+                window.trainingMode = true;
+                showTrainingStatus('Training mode activated. Upload a PDF to provide feedback.', 'info');
+            }
+
+            function provideFeedback() {
+                const feedback = prompt('Please provide feedback on the AI\'s performance:\n\n1. Was watermark detection accurate?\n2. Was the SAT format correctly identified?\n3. Any specific improvements needed?');
+                
+                if (feedback) {
+                    // Send feedback to backend
+                    fetch('/api/feedback', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            feedback: feedback,
+                            timestamp: new Date().toISOString()
+                        })
+                    })
+                    .then(response => response.json())
+                    .then(data => {
+                        showTrainingStatus('✅ Feedback submitted successfully! Thank you for helping improve the AI.', 'success');
+                    })
+                    .catch(error => {
+                        showTrainingStatus('❌ Failed to submit feedback. Please try again.', 'error');
+                    });
+                }
+            }
+
+            function showTrainingStatus(message, type) {
+                const status = document.getElementById('trainingStatus');
+                status.innerHTML = message;
+                status.className = `training-status ${type}`;
+                
+                // Clear status after 5 seconds
+                setTimeout(() => {
+                    status.innerHTML = '';
+                    status.className = 'training-status';
                 }, 5000);
             }
 
