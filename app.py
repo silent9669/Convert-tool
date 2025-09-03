@@ -948,13 +948,14 @@ class SATDocumentProcessor:
                 r'^(?:Section|Part)\s+\d+[:\s]*',  # "Section 1:" or "Part 1:"
                 r'^(?:Reading|Writing|Math|Language)\s+(?:Test|Section)[:\s]*',  # "Reading Test:" or "Math Section:"
                 r'^(?:Evidence-Based|Critical\s+Reading|Mathematics)[:\s]*',  # "Evidence-Based Reading:" or "Mathematics:"
+                r'^(?:English|Math|Reading|Writing)\s+Section',  # "English Section" or "Math Section"
             ],
             'reading_passage': [
                 r'^Reading\s+Passage\s*\d+[:\s]*$',  # "Reading Passage 1:" at start of line
                 r'^Questions?\s*\d+[-\s]*\d*\s*are\s+based\s+on\s+the\s+following\s+passage$',  # "Questions 1-10 are based on the following passage"
                 r'^The\s+following\s+passage\s+is\s+adapted\s+from',  # "The following passage is adapted from..."
                 r'^Read\s+the\s+following\s+passage',  # "Read the following passage..."
-                # New patterns for SAT format
+                # Enhanced patterns for SAT format based on research
                 r'^The\s+unique\s+',  # "The unique subak water management system..."
                 r'^The\s+mihrab\s+',  # "The mihrab (or niche)..."
                 r'^The\s+Egyptian\s+',  # "The Egyptian plover..."
@@ -962,6 +963,14 @@ class SATDocumentProcessor:
                 r'^[A-Z][a-z]+\s+[a-z]+\s+[a-z]+\s+system',  # General pattern for passage starts
                 r'^[A-Z][a-z]+\s+[a-z]+\s+\([^)]+\)\s+is\s+one\s+of',  # "The mihrab (or niche) is one of..."
                 r'^[A-Z][a-z]+\s+[a-z]+-[a-z]+',  # "The Egyptian plover-a bird..."
+                # Additional SAT reading passage patterns
+                r'^[A-Z][a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+',  # Long descriptive sentences
+                r'^[A-Z][a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+',  # Very long descriptive sentences
+                r'^[A-Z][a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+',  # Extra long descriptive sentences
+                # More flexible passage detection
+                r'^[A-Z][a-z]+\s+[a-z]+\s+[a-z]+\s+[a-z]+',  # 4-word sentences
+                r'^[A-Z][a-z]+\s+[a-z]+\s+[a-z]+',  # 3-word sentences
+                r'^[A-Z][a-z]+\s+[a-z]+',  # 2-word sentences
             ],
             'question_start': [
                 r'^\s*\d+\.\s+',  # "1. " at start of line
@@ -970,6 +979,9 @@ class SATDocumentProcessor:
                 r'^\s*\d+\s*$',  # "31" (standalone number)
                 r'^\s*\d+\s+[A-Z]',  # "31 A" (number followed by letter)
                 r'^\s*[A-Z]\s*$',  # "A" (standalone letter)
+                # Enhanced question detection
+                r'^\s*\d+\s*[A-Z]',  # "1 A" (number followed by letter)
+                r'^\s*\d+\s*[a-z]',  # "1 a" (number followed by lowercase letter)
             ],
             'multiple_choice': [
                 r'^\s*[A-D]\)\s+',  # "A) ", "B) ", "C) ", "D) "
@@ -979,24 +991,48 @@ class SATDocumentProcessor:
                 r'^\s*[A-D]\s*[A-Z]',  # "A A+", "B B+" (with additional text)
                 r'^\s*[A-D]\s*[-+]\s*[A-Z]',  # "A- A+", "B- B+" (with dash)
                 r'^\s*[A-D]\s*[A-Z]+\s*$',  # "A A+", "B B+" (standalone with letters)
+                # Enhanced multiple choice detection
+                r'^\s*[A-D]\s*[a-z]',  # "A a", "B b" (with lowercase)
+                r'^\s*[A-D]\s*[0-9]',  # "A 1", "B 2" (with numbers)
+                r'^\s*[A-D]\s*[^\s]',  # "A +", "B -" (with symbols)
             ],
             'math_indicators': [
                 r'\b(?:function|equation|graph|slope|intercept|variable|solve|calculate|area|perimeter|volume|angle|triangle|rectangle|circle)\b',
                 r'[=+\-*/(){}[\]^]',  # Mathematical symbols
                 r'\b\d+\s*(?:times|multiplied by|divided by|plus|minus)\b',  # Word problems
                 r'\b(?:length|width|height|radius|diameter|base|height)\b',  # Geometry terms
+                # Enhanced math detection
+                r'\b(?:algebra|geometry|trigonometry|calculus|statistics|probability)\b',
+                r'\b(?:x|y|z|a|b|c)\s*[=+\-*/]',  # Variables in equations
+                r'\b(?:fraction|decimal|percentage|ratio|proportion)\b',
+                r'\b(?:quadratic|linear|exponential|logarithmic)\b',
             ],
             'reading_indicators': [
                 r'\b(?:passage|author|text|paragraph|line|suggests|implies|indicates|according to)\b',
                 r'\b(?:main idea|central theme|primary purpose|best describes)\b',
                 r'\b(?:inference|conclusion|implication|evidence)\b',
                 r'\b(?:vocabulary|word|phrase|meaning|definition)\b',
+                # Enhanced reading detection
+                r'\b(?:tone|mood|style|rhetoric|argument|persuasion)\b',
+                r'\b(?:compare|contrast|analyze|evaluate|interpret)\b',
+                r'\b(?:support|refute|challenge|question)\b',
             ],
             'writing_indicators': [
                 r'\b(?:grammar|sentence|paragraph|transition|conclusion|introduction)\b',
                 r'\b(?:subject|verb|pronoun|agreement|tense|parallel)\b',
                 r'\b(?:no change|omit|delete|add|replace)\b',
                 r'[A-D]\)\s*(?:No change|omit|delete)',  # Writing section options
+                # Enhanced writing detection
+                r'\b(?:punctuation|comma|semicolon|colon|apostrophe)\b',
+                r'\b(?:conjunction|preposition|article|adjective|adverb)\b',
+                r'\b(?:clause|phrase|sentence|paragraph|essay)\b',
+            ],
+            'image_indicators': [
+                r'\[Image\]',  # "[Image]" placeholder
+                r'\[Figure\s+\d+\]',  # "[Figure 1]" placeholder
+                r'\[Graph\]',  # "[Graph]" placeholder
+                r'\[Chart\]',  # "[Chart]" placeholder
+                r'\[Diagram\]',  # "[Diagram]" placeholder
             ]
         }
     
@@ -1194,8 +1230,8 @@ class SATDocumentProcessor:
             text = self.watermark_remover.extract_text_from_pdf(input_path)
             logger.info(f"Extracted text length: {len(text)} characters")
             
-            # Extract images for integration
-            images = self.watermark_remover._extract_images_from_pdf(input_path)
+            # Extract images for integration (disabled for now due to extraction issues)
+            images = []  # self.watermark_remover._extract_images_from_pdf(input_path)
             logger.info(f"Extracted {len(images)} images from document")
             
             # Detect SAT structure with image integration
@@ -1220,8 +1256,8 @@ class SATDocumentProcessor:
             text = self.watermark_remover.extract_text_from_pdf(input_path)
             logger.info(f"Extracted text length: {len(text)} characters")
             
-            # Extract images for integration
-            images = self.watermark_remover._extract_images_from_pdf(input_path)
+            # Extract images for integration (disabled for now due to extraction issues)
+            images = []  # self.watermark_remover._extract_images_from_pdf(input_path)
             logger.info(f"Extracted {len(images)} images from document")
             
             # Detect SAT structure with image integration
@@ -1261,6 +1297,32 @@ class SATDocumentProcessor:
             
         except Exception as e:
             logger.error(f"SAT document processing for Math section failed: {e}")
+            raise
+    
+    def process_sat_document_unified(self, input_path: str) -> str:
+        """Process SAT document with unified English/Math processing"""
+        try:
+            logger.info(f"Processing SAT document with unified processing: {input_path}")
+            
+            # Extract text with enhanced watermark removal
+            text = self.watermark_remover.extract_text_from_pdf(input_path)
+            logger.info(f"Extracted text length: {len(text)} characters")
+            
+            # Extract images for integration (disabled for now due to extraction issues)
+            images = []  # self.watermark_remover._extract_images_from_pdf(input_path)
+            logger.info(f"Extracted {len(images)} images from document")
+            
+            # Detect SAT structure with image integration
+            sat_structure = self._detect_sat_structure_with_images(text, images)
+            logger.info(f"Detected SAT structure with images: {sat_structure}")
+            
+            # Process and format for Word with unified processing
+            formatted_text = self._format_sat_for_word_unified(text, sat_structure, images)
+            
+            return formatted_text
+            
+        except Exception as e:
+            logger.error(f"SAT document processing with unified processing failed: {e}")
             raise
     
     def _detect_sat_structure(self, text: str) -> Dict:
@@ -1309,10 +1371,15 @@ class SATDocumentProcessor:
                     if current_question:
                         # Classify the question before adding
                         question_classification = self._classify_question_type(
-                            current_question['text'], 
-                            ' '.join(current_question['content'])
+                            current_question['text']
                         )
-                        current_question.update(question_classification)
+                        current_question['section_type'] = question_classification
+                        
+                        # Link passage content to question if available
+                        if current_passage and current_passage['content']:
+                            current_question['passage_content'] = current_passage['content']
+                            current_question['passage_type'] = current_passage.get('passage_type', 'reading')
+                        
                         structure['questions'].append(current_question)
                         question_counter += 1
                     
@@ -1321,7 +1388,8 @@ class SATDocumentProcessor:
                         'content': [],
                         'choices': [],
                         'line_number': i,
-                        'question_number': question_counter + 1
+                        'question_number': question_counter + 1,
+                        'images': []  # Initialize images list
                     }
                 
                 # Detect multiple choice options
@@ -1357,16 +1425,24 @@ class SATDocumentProcessor:
             if current_question:
                 # Classify the final question
                 question_classification = self._classify_question_type(
-                    current_question['text'], 
-                    ' '.join(current_question['content'])
+                    current_question['text']
                 )
-                current_question.update(question_classification)
+                current_question['section_type'] = question_classification
+                
+                # Link passage content to final question if available
+                if current_passage and current_passage['content']:
+                    current_question['passage_content'] = current_passage['content']
+                    current_question['passage_type'] = current_passage.get('passage_type', 'reading')
+                
                 structure['questions'].append(current_question)
                 question_counter += 1
             
             # Determine overall document type
             structure['total_questions'] = question_counter
             structure['document_type'] = self._determine_document_type(structure)
+            
+            # Enhance with AI for better detection
+            structure = self._enhance_sat_detection_with_ai(text, structure)
             
             logger.info(f"Detected {len(structure['sections'])} sections, {len(structure['reading_passages'])} passages, {len(structure['questions'])} questions")
             logger.info(f"Document type: {structure['document_type']}")
@@ -1419,38 +1495,42 @@ class SATDocumentProcessor:
         return False
     
     def _format_sat_for_word(self, text: str, structure: Dict) -> str:
-        """Format SAT content for Word document with simplified structure"""
+        """Format SAT content for Word document matching the image format"""
         formatted_lines = []
         
-        # Process questions with simplified format
+        # Process questions with enhanced format matching the image
         question_number = 1
         for question in structure['questions']:
-            # Add question number separator
-            formatted_lines.append(f"-question number {question_number}")
+            # Add question number with label (as shown in image)
+            formatted_lines.append(f"Question {question_number}")
             formatted_lines.append("")
             
-            # Add reading passage content (if any)
+            # Add reading passage content (without label, as shown in image)
             if 'passage_content' in question and question['passage_content']:
-                formatted_lines.append("+reading passage")
                 for line in question['passage_content']:
-                    formatted_lines.append(line)
+                    if line.strip():  # Only add non-empty lines
+                        formatted_lines.append(line.strip())
                 formatted_lines.append("")
             
-            # Add question text
-            formatted_lines.append("+question text")
-            if 'content' in question:
+            # Add question text (without label, as shown in image)
+            if 'content' in question and question['content']:
                 for line in question['content']:
-                    formatted_lines.append(line)
-            formatted_lines.append("")
-            
-            # Add multiple choice options
-            if question['choices']:
-                formatted_lines.append("+multiple choice")
-                for choice in question['choices']:
-                    formatted_lines.append(choice['text'])
+                    if line.strip():  # Only add non-empty lines
+                        formatted_lines.append(line.strip())
                 formatted_lines.append("")
             
-            # Add spacing between questions
+            # Add multiple choice options with A,B,C,D labels (without "multiple choice" label)
+            if question['choices']:
+                for choice in question['choices']:
+                    if choice.get('text', '').strip():
+                        # Format as "A. option text" (matching image format)
+                        option_label = choice.get('option', '')
+                        option_text = choice['text'].strip()
+                        if option_label and option_text:
+                            formatted_lines.append(f"{option_label}. {option_text}")
+                formatted_lines.append("")
+            
+            # Add clear separation between questions (as shown in image)
             formatted_lines.append("")
             formatted_lines.append("")
             question_number += 1
@@ -1496,16 +1576,70 @@ class SATDocumentProcessor:
     
     def _image_belongs_to_passage(self, image: Dict, passage: Dict) -> bool:
         """Determine if an image belongs to a specific passage"""
-        # Simple heuristic: image is on the same page as passage content
-        # In a more sophisticated system, you could use OCR to detect image captions
-        # or analyze image position relative to text blocks
+        # Enhanced heuristic: image is on the same page as passage content
+        # or within a reasonable range of the passage
         
-        if 'start_line' in passage:
+        if 'line_number' in passage:
             # Estimate page number from line number (assuming ~50 lines per page)
-            estimated_page = passage['start_line'] // 50 + 1
+            estimated_page = passage['line_number'] // 50 + 1
             return image['page'] == estimated_page
         
         return False
+    
+    def _integrate_images_with_content_enhanced(self, structure: Dict, images: List[Dict]) -> Dict:
+        """Enhanced image integration with better matching"""
+        # Integrate images into reading passages
+        for passage in structure['reading_passages']:
+            passage['images'] = []
+            
+            # Find images that belong to this passage
+            for image in images:
+                if self._image_belongs_to_passage(image, passage):
+                    passage['images'].append(image)
+                    logger.info(f"Image {image['index']} integrated into passage: {passage['text']}")
+        
+        # Integrate images into questions
+        for question in structure['questions']:
+            question['images'] = []
+            
+            # Find images that belong to this question
+            for image in images:
+                if self._image_belongs_to_question(image, question):
+                    question['images'].append(image)
+                    logger.info(f"Image {image['index']} integrated into question: {question['text']}")
+        
+        return structure
+    
+    def _image_belongs_to_question(self, image: Dict, question: Dict) -> bool:
+        """Determine if an image belongs to a specific question"""
+        if 'line_number' in question:
+            # Estimate page number from line number (assuming ~50 lines per page)
+            estimated_page = question['line_number'] // 50 + 1
+            return image['page'] == estimated_page
+        
+        return False
+    
+    def _link_passages_to_questions(self, structure: Dict) -> Dict:
+        """Link reading passages to their corresponding questions"""
+        for question in structure['questions']:
+            question['passage_content'] = []
+            
+            # Find the most relevant passage for this question
+            best_passage = None
+            min_distance = float('inf')
+            
+            for passage in structure['reading_passages']:
+                if 'line_number' in passage and 'line_number' in question:
+                    distance = abs(passage['line_number'] - question['line_number'])
+                    if distance < min_distance and distance < 100:  # Within reasonable range
+                        min_distance = distance
+                        best_passage = passage
+            
+            if best_passage:
+                question['passage_content'] = best_passage['content']
+                logger.info(f"Linked passage to question {question.get('question_number', 'unknown')}")
+        
+        return structure
     
     def _format_sat_for_word_with_images(self, text: str, structure: Dict, images: List[Dict]) -> str:
         """Format SAT content for Word document with image integration"""
@@ -1558,54 +1692,130 @@ class SATDocumentProcessor:
         return '\n'.join(formatted_lines)
     
     def _format_sat_for_word_english(self, text: str, structure: Dict, images: List[Dict]) -> str:
-        """Format SAT content for Word document with English section focus (text processing)"""
+        """Format SAT content for Word document with unified English/Math format"""
         formatted_lines = []
         
-        # Add document metadata
-        formatted_lines.append(f"- document type : {structure.get('document_type', 'unknown')}")
-        formatted_lines.append(f"+Total Questions: {structure.get('total_questions', 0)}")
-        formatted_lines.append("")
-        
-        # Process reading passages with exact format
-        for passage in structure['reading_passages']:
-            formatted_lines.append("- reading passage :")
-            if 'content' in passage and passage['content']:
-                for line in passage['content']:
-                    formatted_lines.append(f"+{line}")
-            else:
-                # If no specific content, use the passage text
-                formatted_lines.append(f"+{passage['text']}")
-            formatted_lines.append("")
-        
-        # Process questions with exact format and enhanced classification
+        # Process questions with unified format for both English and Math
+        question_number = 1
         for question in structure['questions']:
-            # Add question metadata
+            # Add question number with label
+            formatted_lines.append(f"Question {question_number}")
+            formatted_lines.append("")
+            
+            # Determine question type for better processing
             question_type = question.get('question_type', 'unknown')
             section_type = question.get('section_type', 'unknown')
-            difficulty = question.get('difficulty', 'medium')
-            topic = question.get('topic', 'general')
             
-            formatted_lines.append(f"- question type : {question_type}")
-            formatted_lines.append(f"+Section: {section_type}")
-            formatted_lines.append(f"+Difficulty: {difficulty}")
-            formatted_lines.append(f"+Topic: {topic}")
-            formatted_lines.append("")
+            # Add reading passage content (for English sections) - without label
+            if section_type in ['english', 'reading', 'writing'] and 'passage_content' in question and question['passage_content']:
+                for line in question['passage_content']:
+                    if line.strip():  # Only add non-empty lines
+                        formatted_lines.append(line.strip())
+                formatted_lines.append("")
             
-            formatted_lines.append("- question:")
+            # Add question text (without label) - for both English and Math
             if 'content' in question and question['content']:
                 for line in question['content']:
-                    formatted_lines.append(f"+{line}")
+                    if line.strip():  # Only add non-empty lines
+                        # For math questions, convert to LaTeX format
+                        if section_type in ['math', 'mathematics']:
+                            latex_line = self._convert_math_to_latex(line.strip())
+                            formatted_lines.append(latex_line)
+                        else:
+                            formatted_lines.append(line.strip())
+                formatted_lines.append("")
+            
+            # Add multiple choice options or written answer space
+            if question['choices']:
+                # Multiple choice format (A., B., C., D.)
+                for choice in question['choices']:
+                    if choice.get('text', '').strip():
+                        option_label = choice.get('option', '')
+                        option_text = choice['text'].strip()
+                        if option_label and option_text:
+                            # For math choices, convert to LaTeX format
+                            if section_type in ['math', 'mathematics']:
+                                latex_choice = self._convert_math_to_latex(option_text)
+                                formatted_lines.append(f"{option_label}. {latex_choice}")
+                            else:
+                                formatted_lines.append(f"{option_label}. {option_text}")
+                formatted_lines.append("")
             else:
-                # If no specific content, use the question text
-                formatted_lines.append(f"+{question['text']}")
+                # Written answer format (blank space for student to fill)
+                formatted_lines.append("Answer: ________________")
+                formatted_lines.append("")
+            
+            # Add clear separation between questions
+            formatted_lines.append("")
+            formatted_lines.append("")
+            question_number += 1
+        
+        return '\n'.join(formatted_lines)
+    
+    def _format_sat_for_word_unified(self, text: str, structure: Dict, images: List[Dict]) -> str:
+        """Format SAT content for Word document with unified English/Math processing"""
+        formatted_lines = []
+        
+        # Process questions with unified format for both English and Math
+        question_number = 1
+        for question in structure['questions']:
+            # Add question number with label
+            formatted_lines.append(f"Question {question_number}")
             formatted_lines.append("")
             
-            # Add multiple choice options with exact format
-            if question['choices']:
-                formatted_lines.append("- options")
-                for choice in question['choices']:
-                    formatted_lines.append(f"+{choice['option']}) {choice['text']}")
+            # Determine question type for better processing
+            question_type = question.get('question_type', 'unknown')
+            section_type = question.get('section_type', 'unknown')
+            
+            # Add images if present (no label)
+            if 'images' in question and question['images']:
+                for image in question['images']:
+                    formatted_lines.append(f"[Image: {image.get('description', 'Figure')}]")
                 formatted_lines.append("")
+            
+            # Add reading passage content (for English sections only) - without label
+            if section_type in ['english', 'reading', 'writing'] and 'passage_content' in question and question['passage_content']:
+                for line in question['passage_content']:
+                    if line.strip():  # Only add non-empty lines
+                        formatted_lines.append(line.strip())
+                formatted_lines.append("")
+            
+            # Add question text (without label) - for both English and Math
+            if 'content' in question and question['content']:
+                for line in question['content']:
+                    if line.strip():  # Only add non-empty lines
+                        # For math questions, convert to LaTeX format
+                        if section_type in ['math', 'mathematics']:
+                            latex_line = self._convert_math_to_latex(line.strip())
+                            formatted_lines.append(latex_line)
+                        else:
+                            formatted_lines.append(line.strip())
+                formatted_lines.append("")
+            
+            # Add multiple choice options or written answer space
+            if question['choices']:
+                # Multiple choice format (A., B., C., D.) - without label
+                for choice in question['choices']:
+                    if choice.get('text', '').strip():
+                        option_label = choice.get('option', '')
+                        option_text = choice['text'].strip()
+                        if option_label and option_text:
+                            # For math choices, convert to LaTeX format
+                            if section_type in ['math', 'mathematics']:
+                                latex_choice = self._convert_math_to_latex(option_text)
+                                formatted_lines.append(f"{option_label}. {latex_choice}")
+                            else:
+                                formatted_lines.append(f"{option_label}. {option_text}")
+                formatted_lines.append("")
+            else:
+                # Written answer format (blank space for student to fill)
+                formatted_lines.append("Answer: ________________")
+                formatted_lines.append("")
+            
+            # Add clear separation between questions
+            formatted_lines.append("")
+            formatted_lines.append("")
+            question_number += 1
         
         return '\n'.join(formatted_lines)
     
@@ -1613,46 +1823,117 @@ class SATDocumentProcessor:
         """Format SAT content for Word document with Math section focus (LaTeX conversion)"""
         formatted_lines = []
         
-        # Process questions with simplified format
+        # Process questions with enhanced format matching the image
         question_number = 1
         for question in structure['questions']:
-            # Add question number separator
-            formatted_lines.append(f"-question number {question_number}")
+            # Add question number with label (as shown in image)
+            formatted_lines.append(f"Question {question_number}")
             formatted_lines.append("")
             
-            # Add reading passage content (if any)
+            # Add reading passage content (if any) - Math section typically has no reading passages
             if 'passage_content' in question and question['passage_content']:
-                formatted_lines.append("+reading passage")
                 for line in question['passage_content']:
-                    # Convert math expressions to LaTeX format
-                    latex_line = self._convert_math_to_latex(line)
-                    formatted_lines.append(latex_line)
+                    if line.strip():  # Only add non-empty lines
+                        # Convert math expressions to LaTeX format
+                        latex_line = self._convert_math_to_latex(line.strip())
+                        formatted_lines.append(latex_line)
                 formatted_lines.append("")
             
-            # Add question text
-            formatted_lines.append("+question text")
-            if 'content' in question:
+            # Add question text (without label, as shown in image)
+            if 'content' in question and question['content']:
                 for line in question['content']:
-                    # Convert math expressions to LaTeX format
-                    latex_line = self._convert_math_to_latex(line)
-                    formatted_lines.append(latex_line)
-            formatted_lines.append("")
-            
-            # Add multiple choice options
-            if question['choices']:
-                formatted_lines.append("+multiple choice")
-                for choice in question['choices']:
-                    # Convert math expressions to LaTeX format
-                    latex_choice = self._convert_math_to_latex(choice['text'])
-                    formatted_lines.append(latex_choice)
+                    if line.strip():  # Only add non-empty lines
+                        # Convert math expressions to LaTeX format
+                        latex_line = self._convert_math_to_latex(line.strip())
+                        formatted_lines.append(latex_line)
                 formatted_lines.append("")
             
-            # Add spacing between questions
+            # Add multiple choice options with A,B,C,D labels (without "multiple choice" label)
+            if question['choices']:
+                for choice in question['choices']:
+                    if choice.get('text', '').strip():
+                        # Format as "A. option text" (matching image format)
+                        option_label = choice.get('option', '')
+                        option_text = choice['text'].strip()
+                        if option_label and option_text:
+                            # Convert math expressions to LaTeX format
+                            latex_choice = self._convert_math_to_latex(option_text)
+                            formatted_lines.append(f"{option_label}. {latex_choice}")
+                formatted_lines.append("")
+            
+            # Add clear separation between questions (as shown in image)
             formatted_lines.append("")
             formatted_lines.append("")
             question_number += 1
         
         return '\n'.join(formatted_lines)
+    
+    def _enhance_sat_detection_with_ai(self, text: str, structure: Dict) -> Dict:
+        """Enhance SAT structure detection using AI with improved training for PDF learning"""
+        try:
+            if 'gemini' not in self.ai_api_keys:
+                logger.info("No Gemini API key available for AI enhancement")
+                return structure
+
+            import google.generativeai as genai
+            genai.configure(api_key=self.ai_api_keys['gemini'])
+            model = genai.GenerativeModel('gemini-2.5-flash')
+
+            # Create enhanced prompt for AI training based on SAT format research and image format
+            prompt = f"""
+            You are an expert SAT test analyzer. Analyze this SAT test content and enhance the structure detection to match the exact format shown in the reference image.
+
+            Text sample: {text[:3000]}...
+
+            Current structure: {structure}
+
+            TARGET FORMAT (matching the image):
+            1. Question Number: "Question 1", "Question 2", etc. (with label)
+            2. Reading Passage: Long descriptive text (without any label)
+            3. Question Text: The actual question (without any label)
+            4. Multiple Choice: "A. option text", "B. option text", etc. (without "multiple choice" label)
+
+            SAT Format Requirements:
+            - Reading Section: Contains reading passages followed by questions
+            - Math Section: Contains math problems with functions, equations, and multiple choice
+            - Writing Section: Contains grammar and writing questions
+
+            Please enhance the structure with:
+            1. Better question separation and numbering
+            2. Accurate reading passage detection (long descriptive text before questions)
+            3. Clear question text identification
+            4. Proper multiple choice formatting (A, B, C, D with periods)
+            5. Math function detection and LaTeX conversion for math sections
+            6. Image detection and integration for reading passages
+
+            Focus on learning from this PDF to:
+            - Separate each question clearly with proper spacing
+            - Identify reading passages as continuous text blocks
+            - Extract question text without extra labels
+            - Format multiple choice options as "A. text", "B. text", etc.
+            - Detect and preserve images in reading passages
+
+            Return enhanced structure as JSON format with improved question separation and format compliance.
+            """
+
+            response = model.generate_content(prompt)
+
+            if response.text:
+                # Parse AI response and merge with existing structure
+                try:
+                    import json
+                    ai_enhanced = json.loads(response.text)
+                    # Merge AI enhancements with existing structure
+                    structure.update(ai_enhanced)
+                    logger.info("AI enhancement applied successfully with PDF learning for SAT format detection")
+                except json.JSONDecodeError:
+                    logger.warning("AI response not in valid JSON format")
+
+            return structure
+
+        except Exception as e:
+            logger.warning(f"AI enhancement failed: {e}")
+            return structure
     
     def _convert_math_to_latex(self, text: str) -> str:
         """Convert math expressions to LaTeX format using pdftolatex approach"""
@@ -1790,6 +2071,38 @@ class SATDocumentProcessor:
             logger.warning(f"LaTeX conversion failed for '{text}': {e}")
             return text
     
+    def _classify_question_type(self, question_text: str) -> str:
+        """Classify question type based on content"""
+        question_lower = question_text.lower()
+        
+        # Math indicators
+        if any(word in question_lower for word in ['solve', 'calculate', 'find', 'equation', 'function', 'graph', 'algebra', 'geometry', 'trigonometry']):
+            return 'math'
+        
+        # Reading indicators
+        if any(word in question_lower for word in ['passage', 'author', 'main idea', 'purpose', 'tone', 'infer', 'imply']):
+            return 'reading'
+        
+        # Writing indicators
+        if any(word in question_lower for word in ['grammar', 'punctuation', 'sentence', 'paragraph', 'edit', 'revise']):
+            return 'writing'
+        
+        return 'unknown'
+    
+    def _classify_section_type_from_content(self, content: List[str]) -> str:
+        """Classify section type based on content"""
+        content_text = ' '.join(content).lower()
+        
+        # Math indicators
+        if any(word in content_text for word in ['equation', 'function', 'graph', 'algebra', 'geometry', 'trigonometry', 'solve', 'calculate']):
+            return 'math'
+        
+        # English indicators
+        if any(word in content_text for word in ['passage', 'author', 'main idea', 'purpose', 'tone', 'grammar', 'punctuation']):
+            return 'english'
+        
+        return 'unknown'
+
 
 class DocumentProcessor:
     """Enhanced document processing with SAT support"""
@@ -1800,22 +2113,20 @@ class DocumentProcessor:
         logger.info("Enhanced document processor initialized with SAT support")
     
     def process_document(self, file_path: str, section_type: str = 'english') -> Tuple[str, Dict]:
-        """Process PDF document with watermark removal and Word conversion"""
+        """Process PDF document with unified English/Math processing and watermark removal"""
         try:
-            logger.info(f"Processing {file_path} with section type: {section_type}")
+            logger.info(f"Processing {file_path} with unified section processing")
             
             # Check if this is a SAT document first (for both English and Math sections)
             is_sat = self._is_sat_document(file_path)
             if is_sat:
-                logger.info("SAT document detected - using specialized processor")
-                word_path = self._convert_sat_to_word(file_path, file_path, section_type)
-                section_type = f'sat_{section_type}'  # Mark as SAT with section type
+                logger.info("SAT document detected - using unified specialized processor")
+                word_path = self._convert_sat_to_word_unified(file_path, file_path)
+                section_type = 'sat_unified'  # Mark as unified SAT processing
             else:
                 # Direct conversion from original PDF with watermark removal in text processing
-                if section_type == 'math':
-                    word_path = self._convert_to_word_math(file_path, file_path)
-                else:
-                    word_path = self._convert_to_word_english(file_path, file_path)
+                word_path = self._convert_to_word_unified(file_path, file_path)
+                section_type = 'unified'
             
             metadata = {
                 'success': True,
@@ -1840,6 +2151,15 @@ class DocumentProcessor:
         try:
             # Quick check of first few pages for SAT indicators
             text = self.watermark_remover.extract_text_from_pdf(file_path, max_pages=3)
+            
+            # If text extraction failed (likely image-based PDF), use filename as hint
+            if len(text) < 10:  # Very little text extracted
+                filename = Path(file_path).name.lower()
+                sat_filename_indicators = ['sat', 'test', 'exam', 'practice']
+                if any(indicator in filename for indicator in sat_filename_indicators):
+                    logger.info(f"SAT detection based on filename: {filename}")
+                    return True
+            
             return self._is_sat_document_from_text(text)
             
         except Exception as e:
@@ -1885,16 +2205,13 @@ class DocumentProcessor:
         # Lower threshold for detection
         return total_score >= 2
     
-    def _convert_sat_to_word(self, pdf_path: str, original_filename: str, section_type: str = 'english') -> str:
-        """Convert SAT PDF to Word document with format preservation for specific section"""
-        logger.info(f"Converting SAT document to Word with {section_type} section processing...")
+    def _convert_sat_to_word_unified(self, pdf_path: str, original_filename: str) -> str:
+        """Convert SAT PDF to Word document with unified English/Math processing"""
+        logger.info("Converting SAT document to Word with unified processing...")
         
         try:
-            # Process SAT document through specialized processor with section-specific handling
-            if section_type == 'math':
-                formatted_text = self.sat_processor.process_sat_document_math(pdf_path)
-            else:
-                formatted_text = self.sat_processor.process_sat_document_english(pdf_path)
+            # Process SAT document through unified processor
+            formatted_text = self.sat_processor.process_sat_document_unified(pdf_path)
             
             # Create Word document
             word_doc = Document()
@@ -1912,13 +2229,13 @@ class DocumentProcessor:
             subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
             # Add processing info
-            info = word_doc.add_paragraph("Processed with SAT format detection and watermark removal")
+            info = word_doc.add_paragraph("Processed with unified SAT format detection and watermark removal")
             info.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
             # Add separator
             word_doc.add_paragraph("=" * 50)
             
-            # Process formatted text with enhanced SAT format
+            # Process formatted text with unified SAT format (Question {number} format)
             lines = formatted_text.split('\n')
             current_section = None
             
@@ -1927,105 +2244,48 @@ class DocumentProcessor:
                 if not line:
                     continue
                 
-                # Process document metadata
-                if line.startswith("- document type :"):
-                    metadata_text = line.replace("- document type :", "").strip()
-                    heading = word_doc.add_heading(f"📋 SAT Document Analysis", level=1)
-                    heading.style.font.bold = True
-                    heading.style.font.color.rgb = RGBColor(0, 0, 139)  # Dark blue
-                    
-                    # Add document type as subtitle
-                    doc_type_para = word_doc.add_paragraph(f"Document Type: {metadata_text.title()}")
-                    doc_type_para.style.font.bold = True
-                    doc_type_para.style.font.color.rgb = RGBColor(0, 100, 0)  # Dark green
-                    doc_type_para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
-                    continue
-                
-                # Process question type metadata
-                if line.startswith("- question type :"):
-                    question_type = line.replace("- question type :", "").strip()
-                    if question_type != 'unknown':
-                        heading = word_doc.add_heading(f"📝 {question_type.replace('_', ' ').title()}", level=2)
-                        heading.style.font.bold = True
-                        heading.style.font.color.rgb = RGBColor(128, 0, 128)  # Purple
-                    continue
-                
-                # Process reading passages
-                if line == "- reading passage :":
-                    current_section = "passage"
-                    heading = word_doc.add_heading("📖 Reading Passage", level=2)
-                    heading.style.font.bold = True
-                    heading.style.font.color.rgb = RGBColor(0, 0, 139)  # Dark blue
-                    continue
-                
-                # Process questions
-                if line == "- question:":
+                # Process new SAT format: Question {number}
+                if line.startswith("Question "):
                     current_section = "question"
-                    heading = word_doc.add_heading("❓ Question", level=3)
+                    # Add question number as heading
+                    heading = word_doc.add_heading(line, level=2)
                     heading.style.font.bold = True
-                    heading.style.font.color.rgb = RGBColor(139, 0, 0)  # Dark red
+                    heading.style.font.color.rgb = RGBColor(0, 0, 139)  # Dark blue
+                    heading.paragraph_format.space_after = Pt(12)
                     continue
                 
-                # Process options
-                if line == "- options":
+                # Process multiple choice options (A., B., C., D.)
+                if line.startswith(('A.', 'B.', 'C.', 'D.')):
                     current_section = "options"
-                    heading = word_doc.add_heading("🔤 Multiple Choice Options", level=3)
-                    heading.style.font.bold = True
-                    heading.style.font.color.rgb = RGBColor(0, 100, 0)  # Dark green
-                    continue
-                
-                # Process metadata lines (section, difficulty, topic)
-                if line.startswith('+') and ('Section:' in line or 'Difficulty:' in line or 'Topic:' in line):
-                    content_text = line[1:].strip()  # Remove the + prefix
-                    if content_text:
-                        para = word_doc.add_paragraph(f"ℹ️ {content_text}")
-                        para.paragraph_format.space_after = Pt(3)
-                        para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                        para.style.font.italic = True
-                        para.style.font.color.rgb = RGBColor(128, 128, 128)  # Gray
-                    continue
-                
-                # Process content with better formatting
-                if line.startswith('+') and len(line) > 1:
-                    content_text = line[1:].strip()  # Remove the + prefix
-                    if content_text:
-                        para = word_doc.add_paragraph(content_text)
-                        para.paragraph_format.space_after = Pt(6)
-                        
-                        # Different alignment based on section
-                        if current_section == "passage":
-                            para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-                            para.style.font.size = Pt(11)
-                        elif current_section == "question":
-                            para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                            para.style.font.size = Pt(12)
-                            para.style.font.bold = True
-                        elif current_section == "options":
-                            para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
-                            para.style.font.size = Pt(11)
-                            # Add bullet point for options
-                            para.style = 'List Bullet'
-                    continue
-                
-                # Regular paragraph (fallback)
-                if line and not line.startswith('-'):
                     para = word_doc.add_paragraph(line)
                     para.paragraph_format.space_after = Pt(6)
+                    para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                    para.style.font.size = Pt(11)
+                    continue
+                
+                # Process regular content (reading passages, question text)
+                if line and not line.startswith(('Question ', 'A.', 'B.', 'C.', 'D.')):
+                    # This is reading passage content or question text
+                    para = word_doc.add_paragraph(line)
+                    para.paragraph_format.space_after = Pt(6)
+                    para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    para.style.font.size = Pt(11)
+                    continue
             
             # Save Word document
-            output_path = os.path.join(PROCESSED_FOLDER, f"{Path(original_filename).stem}_SAT_Formatted.docx")
+            output_path = os.path.join(PROCESSED_FOLDER, f"{Path(original_filename).stem}_SAT_Unified.docx")
             word_doc.save(output_path)
             
-            logger.info(f"SAT Word document saved: {output_path}")
+            logger.info(f"Unified SAT Word document saved: {output_path}")
             return output_path
             
         except Exception as e:
-            logger.error(f"SAT to Word conversion failed: {e}")
+            logger.error(f"Unified SAT to Word conversion failed: {e}")
             raise
     
-    def _convert_to_word_english(self, pdf_path: str, original_filename: str) -> str:
-        """Convert PDF to Word document for English section (text processing)"""
-        logger.info("Converting to Word document (English section)...")
+    def _convert_to_word_unified(self, pdf_path: str, original_filename: str) -> str:
+        """Convert PDF to Word document with unified processing (English/Math)"""
+        logger.info("Converting to Word document with unified processing...")
         
         try:
             # Open the cleaned PDF
@@ -2036,10 +2296,10 @@ class DocumentProcessor:
             
             # Set document properties
             word_doc.core_properties.title = f"Converted Document - {Path(original_filename).stem}"
-            word_doc.core_properties.author = "PDF Watermark Remover - English Section"
+            word_doc.core_properties.author = "PDF Watermark Remover - Unified Processing"
             
             # Add title
-            title = word_doc.add_heading("Converted Document - English Section", 0)
+            title = word_doc.add_heading("Converted Document - Unified Processing", 0)
             title.alignment = WD_ALIGN_PARAGRAPH.CENTER
             
             # Add subtitle
@@ -2474,16 +2734,40 @@ def submit_feedback():
         # Log feedback for AI training
         logger.info(f"User feedback received: {feedback}")
         
-        # Store feedback (in a real implementation, you'd save to database)
+        # Store feedback for AI training (in a real implementation, you'd save to database)
         feedback_data = {
             'feedback': feedback,
             'timestamp': timestamp,
             'user_agent': request.headers.get('User-Agent', ''),
-            'ip_address': request.remote_addr
+            'ip_address': request.remote_addr,
+            'training_type': 'sat_format_improvement'
         }
         
-        # Here you could save to a database or file for AI training
-        # For now, we'll just log it
+        # Save feedback to file for AI training analysis
+        try:
+            import json
+            import os
+            
+            feedback_file = 'training_feedback.json'
+            feedback_list = []
+            
+            # Load existing feedback if file exists
+            if os.path.exists(feedback_file):
+                with open(feedback_file, 'r', encoding='utf-8') as f:
+                    feedback_list = json.load(f)
+            
+            # Add new feedback
+            feedback_list.append(feedback_data)
+            
+            # Save updated feedback
+            with open(feedback_file, 'w', encoding='utf-8') as f:
+                json.dump(feedback_list, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Feedback saved to {feedback_file} for AI training")
+            
+        except Exception as e:
+            logger.warning(f"Failed to save feedback to file: {e}")
+        
         logger.info(f"Feedback data: {feedback_data}")
         
         return jsonify({

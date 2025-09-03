@@ -54,3 +54,6 @@ processed/
 
 # Local configuration files
 local_config.py
+
+# Training feedback files
+training_feedback.json
