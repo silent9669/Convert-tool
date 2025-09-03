@@ -87,8 +87,8 @@ class EnhancedWatermarkRemover:
         self.trained_watermarks = []
         
         # Auto-detection parameters
-        self.watermark_threshold = 0.7  # Similarity threshold for watermark detection
-        self.frequency_threshold = 5    # Minimum frequency to consider as watermark
+        self.watermark_threshold = 0.9  # Higher threshold - more conservative detection
+        self.frequency_threshold = 10   # Higher frequency threshold - less aggressive
         self.position_weight = 0.3      # Weight for position-based detection
         
         # Training parameters
@@ -98,7 +98,9 @@ class EnhancedWatermarkRemover:
         # AI Training parameters
         self.use_ai_training = True     # Enable AI-powered training
         self.ai_providers = ['gemini', 'openai']  # Supported AI providers
-        self.ai_api_keys = {}  # Will be set via web interface
+        self.ai_api_keys = {
+            'gemini': 'AIzaSyBunXuGJnLoXfpfxctH6Wjx7x7irs8BKLg'  # User's Gemini API key
+        }
         
     def set_api_key(self, provider: str, api_key: str):
         """Set API key for a specific provider"""
@@ -755,13 +757,17 @@ class EnhancedWatermarkRemover:
             if indicator in text_lower:
                 return True
         
-        # All caps (common for watermarks)
-        if text.isupper() and len(text) > 3:
+        # All caps (common for watermarks) - but be more conservative
+        if text.isupper() and len(text) > 5 and len(text) < 20:
             return True
         
         # Contains special characters or formatting
         if re.search(r'[©®™]', text):
             return True
+        
+        # Don't mark short text as watermark unless it's clearly a watermark
+        if len(text) < 10:
+            return False
         
         return False
     
@@ -897,6 +903,8 @@ class SATDocumentProcessor:
                 r'^\s*[A-D]\s+',    # "A ", "B ", "C ", "D "
                 r'^\s*[A-D]\s*$',   # "A", "B", "C", "D" (standalone)
                 r'^\s*[A-D]\s*[A-Z]',  # "A A+", "B B+" (with additional text)
+                r'^\s*[A-D]\s*[-+]\s*[A-Z]',  # "A- A+", "B- B+" (with dash)
+                r'^\s*[A-D]\s*[A-Z]+\s*$',  # "A A+", "B B+" (standalone with letters)
             ],
             'math_indicators': [
                 r'\b(?:function|equation|graph|slope|intercept|variable|solve|calculate|area|perimeter|volume|angle|triangle|rectangle|circle)\b',
@@ -1189,6 +1197,7 @@ class SATDocumentProcessor:
                 'sections': [],
                 'reading_passages': [],
                 'questions': [],
+                'multiple_choices': [],
                 'document_type': 'unknown',
                 'total_questions': 0
             }
@@ -1250,11 +1259,15 @@ class SATDocumentProcessor:
                         choice_text = choice_text.strip()
                         
                         if choice_text:  # Only add if there's actual content
-                            current_question['choices'].append({
+                            choice_obj = {
                                 'text': choice_text,
                                 'option': line[0] if line else 'A',
                                 'is_correct': False
-                            })
+                            }
+                            current_question['choices'].append(choice_obj)
+                            
+                            # Also add to the global multiple_choices list
+                            structure['multiple_choices'].append(choice_obj)
                         continue
                 
                 # Add content to current passage or question
@@ -1787,11 +1800,34 @@ class DocumentProcessor:
             'passage', 'question', 'section'
         ]
         
+        # More flexible SAT detection patterns
+        sat_patterns = [
+            r'[A-D]\.\s*[A-Za-z]',  # A. choice, B. choice, etc.
+            r'[A-D]\s*[A-Za-z]',     # A choice, B choice, etc.
+            r'\d+\s*[A-Za-z]',       # 52 Which choice..., 53 Which choice...
+            r'which choice completes', # "Which choice completes the text..."
+            r'what is the value',      # Math questions
+            r'the graph of the function', # Math questions
+            r'section.*module.*math',   # Section headers
+            r'reading.*writing.*math'   # Section headers
+        ]
+        
         text_lower = text.lower()
+        
+        # Count basic indicators
         indicator_count = sum(1 for indicator in sat_indicators if indicator in text_lower)
         
-        # If more than 3 indicators found, likely SAT document
-        return indicator_count >= 3
+        # Count pattern matches
+        import re
+        pattern_count = sum(1 for pattern in sat_patterns if re.search(pattern, text, re.IGNORECASE))
+        
+        # More flexible detection - if we find multiple choice patterns or question patterns
+        total_score = indicator_count + pattern_count
+        
+        print(f"SAT Detection Debug: indicators={indicator_count}, patterns={pattern_count}, total={total_score}")
+        
+        # Lower threshold for detection
+        return total_score >= 2
     
     def _convert_sat_to_word(self, pdf_path: str, original_filename: str, section_type: str = 'english') -> str:
         """Convert SAT PDF to Word document with format preservation for specific section"""
