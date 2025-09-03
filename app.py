@@ -81,6 +81,15 @@ os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 # Global API key storage
 GEMINI_API_KEY = None
 
+# Try to load local config for testing
+try:
+    from local_config import GEMINI_API_KEY as LOCAL_API_KEY
+    if LOCAL_API_KEY:
+        GEMINI_API_KEY = LOCAL_API_KEY
+        print("✅ Local API key loaded for testing")
+except ImportError:
+    print("ℹ️ No local config found - API key will be set via web interface")
+
 class EnhancedWatermarkRemover:
     """Advanced PDF watermark removal with AI-powered training and image detection"""
     
@@ -110,6 +119,12 @@ class EnhancedWatermarkRemover:
         self.use_ai_training = True     # Enable AI-powered training
         self.ai_providers = ['gemini', 'openai']  # Supported AI providers
         self.ai_api_keys = {}  # Will be set via web interface - no hardcoded keys
+        
+        # Use global API key if available (for testing)
+        global GEMINI_API_KEY
+        if GEMINI_API_KEY:
+            self.ai_api_keys['gemini'] = GEMINI_API_KEY
+            logger.info("API key loaded from local config for testing")
         
     def set_api_key(self, provider: str, api_key: str):
         """Set API key for a specific provider"""
@@ -155,7 +170,7 @@ class EnhancedWatermarkRemover:
             
             # Configure Gemini
             genai.configure(api_key=self.ai_api_keys.get('gemini'))
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('gemini-1.5-pro')
             
             # Create prompt for watermark analysis
             prompt = f"""
@@ -310,7 +325,7 @@ class EnhancedWatermarkRemover:
             # Use Gemini API
             import google.generativeai as genai
             genai.configure(api_key=self.ai_api_keys['gemini'])
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('gemini-1.5-pro')
             
             response = model.generate_content(prompt)
             cleaned_text = response.text
@@ -1144,7 +1159,7 @@ class SATDocumentProcessor:
             # Use Gemini API
             import google.generativeai as genai
             genai.configure(api_key=self.watermark_remover.ai_api_keys['gemini'])
-            model = genai.GenerativeModel('gemini-pro')
+            model = genai.GenerativeModel('gemini-1.5-pro')
             
             response = model.generate_content(prompt)
             ai_response = response.text

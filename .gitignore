@@ -51,3 +51,6 @@ processed/
 # Environment variables
 .env
 .env.local
+
+# Local configuration files
+local_config.py
