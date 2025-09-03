@@ -420,23 +420,217 @@ class EnhancedWatermarkRemover:
     
 
 
-class DocumentProcessor:
-    """Simplified document processing with Word generation fix"""
+class SATDocumentProcessor:
+    """Specialized SAT document processor with format detection and preservation"""
     
     def __init__(self):
         self.watermark_remover = EnhancedWatermarkRemover()
-        logger.info("Document processor initialized")
+        self.sat_patterns = self._initialize_sat_patterns()
+        logger.info("SAT document processor initialized")
+    
+    def _initialize_sat_patterns(self):
+        """Initialize SAT-specific detection patterns"""
+        return {
+            'reading_passage': [
+                r'^Reading\s+Passage\s*\d+[:\s]*$',  # "Reading Passage 1:" at start of line
+                r'^Questions?\s*\d+[-\s]*\d*\s*are\s+based\s+on\s+the\s+following\s+passage$',  # "Questions 1-10 are based on the following passage"
+                r'^The\s+following\s+passage\s+is\s+adapted\s+from',  # "The following passage is adapted from..."
+                r'^Read\s+the\s+following\s+passage',  # "Read the following passage..."
+            ],
+            'question_start': [
+                r'^\s*\d+\.\s+',  # "1. " at start of line
+                r'^\s*Question\s+\d+[:\s]*',  # "Question 1:" or "Question 1"
+                r'^\s*Q\s*\d+[:\s]*',  # "Q1:" or "Q1"
+            ],
+            'multiple_choice': [
+                r'^\s*[A-D]\)\s+',  # "A) ", "B) ", "C) ", "D) "
+                r'^\s*[A-D]\.\s+',  # "A. ", "B. ", "C. ", "D. "
+                r'^\s*[A-D]\s+',    # "A ", "B ", "C ", "D "
+            ],
+            'section_header': [
+                r'^SAT\s+Practice\s+Test',  # "SAT Practice Test"
+                r'^(?:Section|Part)\s+\d+[:\s]*',  # "Section 1:" or "Part 1:"
+                r'^(?:Reading|Writing|Math|Language)\s+(?:Test|Section)[:\s]*',  # "Reading Test:" or "Math Section:"
+                r'^(?:Evidence-Based|Critical\s+Reading|Mathematics)[:\s]*',  # "Evidence-Based Reading:" or "Mathematics:"
+            ]
+        }
+    
+    def process_sat_document(self, input_path: str) -> str:
+        """Process SAT document with format detection and preservation"""
+        try:
+            logger.info(f"Processing SAT document: {input_path}")
+            
+            # Extract text with watermark removal
+            text = self.watermark_remover._extract_text_enhanced(input_path)
+            logger.info(f"Extracted text length: {len(text)} characters")
+            
+            # Detect SAT structure
+            sat_structure = self._detect_sat_structure(text)
+            logger.info(f"Detected SAT structure: {sat_structure}")
+            
+            # Process and format for Word
+            formatted_text = self._format_sat_for_word(text, sat_structure)
+            
+            return formatted_text
+            
+        except Exception as e:
+            logger.error(f"SAT document processing failed: {e}")
+            raise
+    
+    def _detect_sat_structure(self, text: str) -> Dict:
+        """Detect SAT document structure and components"""
+        lines = text.split('\n')
+        structure = {
+            'reading_passages': [],
+            'questions': [],
+            'multiple_choices': [],
+            'sections': [],
+            'format_type': 'unknown'
+        }
+        
+        current_section = None
+        current_passage = None
+        current_question = None
+        
+        for i, line in enumerate(lines):
+            line = line.strip()
+            if not line:
+                continue
+            
+            # Detect section headers
+            if self._matches_pattern(line, self.sat_patterns['section_header']):
+                current_section = line
+                structure['sections'].append({
+                    'type': 'section_header',
+                    'text': line,
+                    'line_number': i
+                })
+                continue
+            
+            # Detect reading passages
+            if self._matches_pattern(line, self.sat_patterns['reading_passage']):
+                current_passage = {
+                    'start_line': i,
+                    'text': line,
+                    'questions': []
+                }
+                structure['reading_passages'].append(current_passage)
+                continue
+            
+            # Detect questions
+            if self._matches_pattern(line, self.sat_patterns['question_start']):
+                current_question = {
+                    'start_line': i,
+                    'text': line,
+                    'choices': [],
+                    'passage_ref': current_passage
+                }
+                structure['questions'].append(current_question)
+                continue
+            
+            # Detect multiple choice options
+            if current_question and self._matches_pattern(line, self.sat_patterns['multiple_choice']):
+                current_question['choices'].append({
+                    'text': line,
+                    'choice': line[0].upper(),
+                    'line_number': i
+                })
+                continue
+            
+            # If we have a current passage, add lines to it
+            if current_passage and not current_question:
+                if 'content' not in current_passage:
+                    current_passage['content'] = []
+                current_passage['content'].append(line)
+            
+            # If we have a current question, add lines to it
+            if current_question and not self._matches_pattern(line, self.sat_patterns['multiple_choice']):
+                if 'content' not in current_question:
+                    current_question['content'] = []
+                current_question['content'].append(line)
+        
+        # Determine format type
+        if structure['reading_passages'] and structure['questions']:
+            structure['format_type'] = 'reading_comprehension'
+        elif structure['questions'] and structure['multiple_choices']:
+            structure['format_type'] = 'multiple_choice'
+        else:
+            structure['format_type'] = 'mixed'
+        
+        return structure
+    
+    def _matches_pattern(self, text: str, patterns: List[str]) -> bool:
+        """Check if text matches any of the given patterns"""
+        for pattern in patterns:
+            if re.search(pattern, text, re.IGNORECASE):
+                return True
+        return False
+    
+    def _format_sat_for_word(self, text: str, structure: Dict) -> str:
+        """Format SAT content for Word document with proper structure"""
+        formatted_lines = []
+        
+        # Add title
+        formatted_lines.append("SAT Practice Test")
+        formatted_lines.append("=" * 50)
+        formatted_lines.append("")
+        
+        # Process sections
+        for section in structure['sections']:
+            formatted_lines.append(f"**{section['text']}**")
+            formatted_lines.append("")
+        
+        # Process reading passages
+        for passage in structure['reading_passages']:
+            formatted_lines.append(f"**{passage['text']}**")
+            formatted_lines.append("")
+            
+            if 'content' in passage:
+                for line in passage['content']:
+                    formatted_lines.append(line)
+                formatted_lines.append("")
+        
+        # Process questions
+        for question in structure['questions']:
+            formatted_lines.append(f"**{question['text']}**")
+            if 'content' in question:
+                for line in question['content']:
+                    formatted_lines.append(line)
+            
+            # Add multiple choice options
+            if question['choices']:
+                formatted_lines.append("")
+                for choice in question['choices']:
+                    formatted_lines.append(f"  {choice['text']}")
+                formatted_lines.append("")
+        
+        return '\n'.join(formatted_lines)
+
+
+class DocumentProcessor:
+    """Enhanced document processing with SAT support"""
+    
+    def __init__(self):
+        self.watermark_remover = EnhancedWatermarkRemover()
+        self.sat_processor = SATDocumentProcessor()
+        logger.info("Enhanced document processor initialized with SAT support")
     
     def process_document(self, file_path: str, section_type: str = 'english') -> Tuple[str, Dict]:
         """Process PDF document with watermark removal and Word conversion"""
         try:
             logger.info(f"Processing {file_path} with section type: {section_type}")
             
-            # Direct conversion from original PDF with watermark removal in text processing
-            if section_type == 'math':
-                word_path = self._convert_to_word_math(file_path, file_path)
+            # Check if this is a SAT document first
+            if self._is_sat_document(file_path):
+                logger.info("SAT document detected - using specialized processor")
+                word_path = self._convert_sat_to_word(file_path, file_path)
+                section_type = 'sat'  # Override section type for SAT
             else:
-                word_path = self._convert_to_word_english(file_path, file_path)
+                # Direct conversion from original PDF with watermark removal in text processing
+                if section_type == 'math':
+                    word_path = self._convert_to_word_math(file_path, file_path)
+                else:
+                    word_path = self._convert_to_word_english(file_path, file_path)
             
             metadata = {
                 'success': True,
@@ -445,7 +639,8 @@ class DocumentProcessor:
                 'section_type': section_type,
                 'processing_time': time.time(),
                 'watermark_removal': 'completed',
-                'word_conversion': 'completed'
+                'word_conversion': 'completed',
+                'sat_detection': 'completed' if section_type == 'sat' else 'not_applicable'
             }
             
             return word_path, metadata
@@ -453,6 +648,111 @@ class DocumentProcessor:
         except Exception as e:
             logger.error(f"Processing failed: {str(e)}")
             logger.error(traceback.format_exc())
+            raise
+    
+    def _is_sat_document(self, file_path: str) -> bool:
+        """Detect if document is SAT format"""
+        try:
+            # Quick check of first few pages for SAT indicators
+            text = self.watermark_remover._extract_text_enhanced(file_path, max_pages=3)
+            return self._is_sat_document_from_text(text)
+            
+        except Exception as e:
+            logger.warning(f"SAT detection failed: {e}")
+            return False
+    
+    def _is_sat_document_from_text(self, text: str) -> bool:
+        """Detect if text content is SAT format"""
+        sat_indicators = [
+            'sat', 'scholastic aptitude test', 'college board',
+            'reading passage', 'evidence-based reading',
+            'questions are based on the following passage',
+            'multiple choice', 'a)', 'b)', 'c)', 'd)',
+            'passage', 'question', 'section'
+        ]
+        
+        text_lower = text.lower()
+        indicator_count = sum(1 for indicator in sat_indicators if indicator in text_lower)
+        
+        # If more than 3 indicators found, likely SAT document
+        return indicator_count >= 3
+    
+    def _convert_sat_to_word(self, pdf_path: str, original_filename: str) -> str:
+        """Convert SAT PDF to Word document with format preservation"""
+        logger.info("Converting SAT document to Word with format preservation...")
+        
+        try:
+            # Process SAT document through specialized processor
+            formatted_text = self.sat_processor.process_sat_document(pdf_path)
+            
+            # Create Word document
+            word_doc = Document()
+            
+            # Set document properties
+            word_doc.core_properties.title = f"SAT Practice Test - {Path(original_filename).stem}"
+            word_doc.core_properties.author = "SAT Document Processor"
+            
+            # Add title
+            title = word_doc.add_heading("SAT Practice Test", 0)
+            title.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Add subtitle
+            subtitle = word_doc.add_paragraph(f"Source: {Path(original_filename).name}")
+            subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Add processing info
+            info = word_doc.add_paragraph("Processed with SAT format detection and watermark removal")
+            info.alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            # Add separator
+            word_doc.add_paragraph("=" * 50)
+            
+            # Process formatted text
+            lines = formatted_text.split('\n')
+            current_heading_level = 1
+            
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Check for section headers
+                if line.startswith('**') and line.endswith('**'):
+                    # Remove markdown formatting
+                    clean_text = line[2:-2]
+                    if 'passage' in clean_text.lower():
+                        word_doc.add_heading(clean_text, level=1)
+                    elif 'section' in clean_text.lower():
+                        word_doc.add_heading(clean_text, level=1)
+                    else:
+                        word_doc.add_heading(clean_text, level=2)
+                    continue
+                
+                # Check for question numbers
+                if re.match(r'^\d+\.', line):
+                    word_doc.add_heading(line, level=3)
+                    continue
+                
+                # Check for multiple choice options
+                if re.match(r'^\s*[A-D][\)\.]\s*', line):
+                    # Indent multiple choice options
+                    para = word_doc.add_paragraph(line)
+                    para.paragraph_format.left_indent = Inches(0.5)
+                    continue
+                
+                # Regular paragraph
+                if line:
+                    word_doc.add_paragraph(line)
+            
+            # Save Word document
+            output_path = os.path.join(PROCESSED_FOLDER, f"{Path(original_filename).stem}_SAT_Formatted.docx")
+            word_doc.save(output_path)
+            
+            logger.info(f"SAT Word document saved: {output_path}")
+            return output_path
+            
+        except Exception as e:
+            logger.error(f"SAT to Word conversion failed: {e}")
             raise
     
     def _convert_to_word_english(self, pdf_path: str, original_filename: str) -> str:
