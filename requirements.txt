@@ -17,6 +17,9 @@ gunicorn==21.2.0
 # Lightweight image processing (replacing heavy opencv)
 Pillow==10.0.1
 
+# OCR Support for Image-based PDFs
+pytesseract==0.3.10
+
 # Core dependencies only
 lxml==4.9.3
 Jinja2==3.1.2

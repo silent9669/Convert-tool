@@ -34,6 +34,17 @@ try:
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     from docx.shared import RGBColor
     import io
+    from PIL import Image
+    
+    # Try to import OCR support (optional)
+    try:
+        import pytesseract
+        OCR_AVAILABLE = True
+        print("OCR support available")
+    except ImportError:
+        OCR_AVAILABLE = False
+        print("OCR support not available - install pytesseract for image-based PDFs")
+    
     print("All required packages imported successfully!")
 except ImportError as e:
     print(f"Import error: {e}")
@@ -98,9 +109,7 @@ class EnhancedWatermarkRemover:
         # AI Training parameters
         self.use_ai_training = True     # Enable AI-powered training
         self.ai_providers = ['gemini', 'openai']  # Supported AI providers
-        self.ai_api_keys = {
-            'gemini': 'AIzaSyBunXuGJnLoXfpfxctH6Wjx7x7irs8BKLg'  # User's Gemini API key
-        }
+        self.ai_api_keys = {}  # Will be set via web interface - no hardcoded keys
         
     def set_api_key(self, provider: str, api_key: str):
         """Set API key for a specific provider"""
@@ -559,7 +568,7 @@ class EnhancedWatermarkRemover:
             return page.get_text()
     
     def extract_text_from_pdf(self, pdf_path: str, max_pages: int = None) -> str:
-        """Extract text from PDF file with enhanced processing"""
+        """Extract text from PDF file with enhanced processing and OCR support"""
         try:
             logger.info(f"Extracting text from PDF: {pdf_path}")
             
@@ -577,6 +586,12 @@ class EnhancedWatermarkRemover:
             for page_num in range(max_pages):
                 page = doc[page_num]
                 page_text = self._extract_text_enhanced(page)
+                
+                # If no text found, try OCR for image-based PDFs
+                if not page_text.strip():
+                    logger.info(f"No text found on page {page_num + 1}, trying OCR...")
+                    page_text = self._extract_text_with_ocr(page)
+                
                 all_text.append(page_text)
             
             # Close the document
@@ -591,6 +606,50 @@ class EnhancedWatermarkRemover:
         except Exception as e:
             logger.error(f"Text extraction from PDF failed: {e}")
             return ""
+    
+    def _extract_text_with_ocr(self, page) -> str:
+        """Extract text from page using OCR for image-based PDFs"""
+        try:
+            # Check if OCR is available
+            if not OCR_AVAILABLE:
+                logger.warning("OCR not available - skipping image-based text extraction")
+                return ""
+            
+            # Convert page to image
+            mat = fitz.Matrix(2.0, 2.0)  # 2x zoom for better OCR
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("png")
+            
+            # Convert to PIL Image
+            image = Image.open(io.BytesIO(img_data))
+            
+            # Use OCR to extract text
+            text = pytesseract.image_to_string(image, config='--psm 6')
+            
+            # Clean up the text
+            text = self._clean_ocr_text(text)
+            
+            logger.info(f"OCR extracted {len(text)} characters")
+            return text
+            
+        except Exception as e:
+            logger.warning(f"OCR extraction failed: {e}")
+            return ""
+    
+    def _clean_ocr_text(self, text: str) -> str:
+        """Clean up OCR text to improve quality"""
+        # Remove excessive whitespace
+        text = re.sub(r'\s+', ' ', text)
+        
+        # Fix common OCR errors
+        text = re.sub(r'[|]', 'I', text)  # Fix pipe to I
+        text = re.sub(r'[0]', 'O', text)  # Fix 0 to O in words
+        text = re.sub(r'[1]', 'l', text)  # Fix 1 to l in words
+        
+        # Remove page numbers and headers/footers
+        text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
+        
+        return text.strip()
     
     def _remove_watermarks_enhanced(self, text: str) -> str:
         """Advanced watermark removal with automatic detection and AI enhancement"""
@@ -1864,6 +1923,7 @@ class DocumentProcessor:
             
             # Process formatted text with enhanced SAT format
             lines = formatted_text.split('\n')
+            current_section = None
             
             for line in lines:
                 line = line.strip()
@@ -1873,36 +1933,46 @@ class DocumentProcessor:
                 # Process document metadata
                 if line.startswith("- document type :"):
                     metadata_text = line.replace("- document type :", "").strip()
-                    heading = word_doc.add_heading(f"Document Type: {metadata_text}", level=1)
+                    heading = word_doc.add_heading(f"📋 SAT Document Analysis", level=1)
                     heading.style.font.bold = True
-                    heading.style.font.color.rgb = RGBColor(0, 0, 0)  # Black
+                    heading.style.font.color.rgb = RGBColor(0, 0, 139)  # Dark blue
+                    
+                    # Add document type as subtitle
+                    doc_type_para = word_doc.add_paragraph(f"Document Type: {metadata_text.title()}")
+                    doc_type_para.style.font.bold = True
+                    doc_type_para.style.font.color.rgb = RGBColor(0, 100, 0)  # Dark green
+                    doc_type_para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     continue
                 
                 # Process question type metadata
                 if line.startswith("- question type :"):
                     question_type = line.replace("- question type :", "").strip()
-                    heading = word_doc.add_heading(f"Question Type: {question_type}", level=4)
-                    heading.style.font.bold = True
-                    heading.style.font.color.rgb = RGBColor(128, 0, 128)  # Purple
+                    if question_type != 'unknown':
+                        heading = word_doc.add_heading(f"📝 {question_type.replace('_', ' ').title()}", level=2)
+                        heading.style.font.bold = True
+                        heading.style.font.color.rgb = RGBColor(128, 0, 128)  # Purple
                     continue
                 
                 # Process reading passages
                 if line == "- reading passage :":
-                    heading = word_doc.add_heading("Reading Passage", level=2)
+                    current_section = "passage"
+                    heading = word_doc.add_heading("📖 Reading Passage", level=2)
                     heading.style.font.bold = True
                     heading.style.font.color.rgb = RGBColor(0, 0, 139)  # Dark blue
                     continue
                 
                 # Process questions
                 if line == "- question:":
-                    heading = word_doc.add_heading("Question", level=3)
+                    current_section = "question"
+                    heading = word_doc.add_heading("❓ Question", level=3)
                     heading.style.font.bold = True
                     heading.style.font.color.rgb = RGBColor(139, 0, 0)  # Dark red
                     continue
                 
                 # Process options
                 if line == "- options":
-                    heading = word_doc.add_heading("Multiple Choice Options", level=4)
+                    current_section = "options"
+                    heading = word_doc.add_heading("🔤 Multiple Choice Options", level=3)
                     heading.style.font.bold = True
                     heading.style.font.color.rgb = RGBColor(0, 100, 0)  # Dark green
                     continue
@@ -1911,25 +1981,39 @@ class DocumentProcessor:
                 if line.startswith('+') and ('Section:' in line or 'Difficulty:' in line or 'Topic:' in line):
                     content_text = line[1:].strip()  # Remove the + prefix
                     if content_text:
-                        para = word_doc.add_paragraph(content_text)
+                        para = word_doc.add_paragraph(f"ℹ️ {content_text}")
                         para.paragraph_format.space_after = Pt(3)
                         para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
                         para.style.font.italic = True
                         para.style.font.color.rgb = RGBColor(128, 128, 128)  # Gray
                     continue
                 
-                # Process passage content
+                # Process content with better formatting
                 if line.startswith('+') and len(line) > 1:
                     content_text = line[1:].strip()  # Remove the + prefix
                     if content_text:
                         para = word_doc.add_paragraph(content_text)
                         para.paragraph_format.space_after = Pt(6)
-                        para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                        
+                        # Different alignment based on section
+                        if current_section == "passage":
+                            para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                            para.style.font.size = Pt(11)
+                        elif current_section == "question":
+                            para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                            para.style.font.size = Pt(12)
+                            para.style.font.bold = True
+                        elif current_section == "options":
+                            para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                            para.style.font.size = Pt(11)
+                            # Add bullet point for options
+                            para.style = 'List Bullet'
                     continue
                 
                 # Regular paragraph (fallback)
                 if line and not line.startswith('-'):
-                    word_doc.add_paragraph(line)
+                    para = word_doc.add_paragraph(line)
+                    para.paragraph_format.space_after = Pt(6)
             
             # Save Word document
             output_path = os.path.join(PROCESSED_FOLDER, f"{Path(original_filename).stem}_SAT_Formatted.docx")
