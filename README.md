@@ -1,23 +1,28 @@
-# PDF Watermark Remover
+# SAT PDF to Word Converter
 
-Simple PDF watermark removal with Word conversion.
+Convert SAT exam PDFs to Word documents with intelligent content detection and formatting.
 
 ## Features
-- **English Section**: Text processing & watermark removal
-- **Math Section**: LaTeX conversion & math detection
-- **Word Export**: Generate .docx files
+- **Smart Detection**: Automatically identifies reading passages, questions, and multiple choice options
+- **Math Support**: Converts mathematical expressions to LaTeX format
+- **Watermark Removal**: Removes watermarks and cleans up text
+- **SAT Format**: Outputs in proper SAT exam structure (27 English questions = 1 module, 22 Math questions = 1 module)
+- **AI Enhancement**: Uses Gemini AI for improved content detection
 
 ## Quick Start
 ```bash
 pip install -r requirements.txt
-python start.py
+python app.py
 ```
 Visit: http://localhost:5000
 
-## Test
-```bash
-python test_watermark_removal.py
-```
+## Usage
+1. Upload a SAT PDF file
+2. The system will automatically detect and convert content
+3. Download the formatted Word document
+
+## Contact
+**Phuc Dang** - phuc.dangcs2007@hcmut.edu.vn
 
 ## License
 MIT
