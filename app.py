@@ -32,6 +32,7 @@ try:
     from docx import Document
     from docx.shared import Inches, Pt
     from docx.enum.text import WD_ALIGN_PARAGRAPH
+    from docx.shared import RGBColor
     import io
     print("All required packages imported successfully!")
 except ImportError as e:
@@ -67,10 +68,10 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 class EnhancedWatermarkRemover:
-    """Advanced PDF watermark removal with automatic detection"""
+    """Advanced PDF watermark removal with AI-powered training and image detection"""
     
     def __init__(self):
-        logger.info("Enhanced watermark remover initialized with auto-detection")
+        logger.info("Enhanced watermark remover initialized with AI-powered training and image detection")
         
         # Base patterns for common watermarks (fallback)
         self.base_patterns = [
@@ -78,10 +79,391 @@ class EnhancedWatermarkRemover:
             r'RESTRICTED', r'PRIVATE', r'CLASSIFIED', r'TOP SECRET'
         ]
         
+        # Trainable watermark patterns (learned from user documents)
+        self.trained_patterns = []
+        self.trained_watermarks = []
+        
         # Auto-detection parameters
         self.watermark_threshold = 0.7  # Similarity threshold for watermark detection
         self.frequency_threshold = 5    # Minimum frequency to consider as watermark
         self.position_weight = 0.3      # Weight for position-based detection
+        
+        # Training parameters
+        self.min_training_samples = 3   # Minimum samples needed for training
+        self.learning_rate = 0.1        # How much to adjust patterns based on feedback
+        
+        # AI Training parameters
+        self.use_ai_training = True     # Enable AI-powered training
+        self.ai_providers = ['gemini', 'openai']  # Supported AI providers
+        self.ai_api_keys = {
+            'gemini': 'AIzaSyBRTfao10Uxm-VBLTYsKo4QsFnfRtCtdIg'  # Pre-configured Gemini key
+        }
+        
+        # Image detection parameters
+        self.image_detection_enabled = True
+        self.min_image_size = 100       # Minimum image size to detect (pixels)
+        self.image_quality = 0.8        # Image quality for extraction
+        
+        # Load any existing trained patterns
+        self._load_trained_patterns()
+    
+    def _ai_enhance_patterns(self, text: str, images: List, watermarks_to_remove: List, content_to_preserve: List) -> Dict:
+        """Use AI to enhance watermark detection patterns"""
+        try:
+            enhanced_patterns = {'remove': [], 'preserve': []}
+            
+            # Try Gemini first (free tier available)
+            if self._has_gemini_api():
+                enhanced_patterns = self._gemini_enhance_patterns(text, images, watermarks_to_remove, content_to_preserve)
+            # Fallback to OpenAI if available
+            elif self._has_openai_api():
+                enhanced_patterns = self._openai_enhance_patterns(text, images, watermarks_to_remove, content_to_preserve)
+            else:
+                logger.info("No AI API keys available, using basic training only")
+                return enhanced_patterns
+            
+            return enhanced_patterns
+            
+        except Exception as e:
+            logger.warning(f"AI enhancement failed: {e}")
+            return {'remove': [], 'preserve': []}
+    
+    def _gemini_enhance_patterns(self, text: str, images: List, watermarks_to_remove: List, content_to_preserve: List) -> Dict:
+        """Use Google Gemini to enhance watermark detection patterns"""
+        try:
+            import google.generativeai as genai
+            
+            # Configure Gemini
+            genai.configure(api_key=self.ai_api_keys.get('gemini'))
+            model = genai.GenerativeModel('gemini-pro')
+            
+            # Create prompt for watermark analysis
+            prompt = f"""
+            Analyze this document content and identify additional watermarks that should be removed.
+            
+            Current watermarks to remove: {watermarks_to_remove}
+            Content to preserve: {content_to_preserve}
+            
+            Document text (first 1000 chars): {text[:1000]}...
+            
+            Based on the content, identify:
+            1. Additional watermark patterns (text that appears repeatedly, headers, footers, etc.)
+            2. Content that should definitely be preserved (main text, questions, answers)
+            3. Suggest improved patterns for existing watermarks
+            
+            Return as JSON:
+            {{
+                "remove": ["pattern1", "pattern2"],
+                "preserve": ["content1", "content2"],
+                "improvements": ["suggestion1", "suggestion2"]
+            }}
+            """
+            
+            response = model.generate_content(prompt)
+            
+            # Parse AI response
+            try:
+                import json
+                result = json.loads(response.text)
+                return {
+                    'remove': result.get('remove', []),
+                    'preserve': result.get('preserve', [])
+                }
+            except:
+                # Fallback parsing
+                return self._parse_ai_response_fallback(response.text)
+                
+        except Exception as e:
+            logger.warning(f"Gemini enhancement failed: {e}")
+            return {'remove': [], 'preserve': []}
+    
+    def _openai_enhance_patterns(self, text: str, images: List, watermarks_to_remove: List, content_to_preserve: List) -> Dict:
+        """Use OpenAI ChatGPT to enhance watermark detection patterns"""
+        try:
+            import openai
+            
+            # Configure OpenAI
+            openai.api_key = self.ai_api_keys.get('openai')
+            
+            # Create prompt for watermark analysis
+            prompt = f"""
+            Analyze this document content and identify additional watermarks that should be removed.
+            
+            Current watermarks to remove: {watermarks_to_remove}
+            Content to preserve: {content_to_preserve}
+            
+            Document text (first 1000 chars): {text[:1000]}...
+            
+            Based on the content, identify:
+            1. Additional watermark patterns (text that appears repeatedly, headers, footers, etc.)
+            2. Content that should definitely be preserved (main text, questions, answers)
+            3. Suggest improved patterns for existing watermarks
+            
+            Return as JSON:
+            {{
+                "remove": ["pattern1", "pattern2"],
+                "preserve": ["content1", "content2"],
+                "improvements": ["suggestion1", "suggestion2"]
+            }}
+            """
+            
+            response = openai.ChatCompletion.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are an expert in document analysis and watermark detection."},
+                    {"role": "user", "content": prompt}
+                ]
+            )
+            
+            ai_response = response.choices[0].message.content
+            
+            # Parse AI response
+            try:
+                import json
+                result = json.loads(ai_response)
+                return {
+                    'remove': result.get('remove', []),
+                    'preserve': result.get('preserve', [])
+                }
+            except:
+                # Fallback parsing
+                return self._parse_ai_response_fallback(ai_response)
+                
+        except Exception as e:
+            logger.warning(f"OpenAI enhancement failed: {e}")
+            return {'remove': [], 'preserve': []}
+    
+    def _parse_ai_response_fallback(self, ai_response: str) -> Dict:
+        """Fallback parsing for AI responses that aren't valid JSON"""
+        try:
+            enhanced_patterns = {'remove': [], 'preserve': []}
+            
+            # Simple pattern extraction from text
+            lines = ai_response.split('\n')
+            for line in lines:
+                line = line.strip().lower()
+                if 'remove' in line or 'watermark' in line:
+                    # Extract potential patterns
+                    words = re.findall(r'\b\w+\b', line)
+                    enhanced_patterns['remove'].extend(words[:3])  # Take first 3 words
+                elif 'preserve' in line or 'keep' in line:
+                    words = re.findall(r'\b\w+\b', line)
+                    enhanced_patterns['preserve'].extend(words[:3])
+            
+            return enhanced_patterns
+            
+        except Exception as e:
+            logger.warning(f"Fallback parsing failed: {e}")
+            return {'remove': [], 'preserve': []}
+    
+    def _has_gemini_api(self) -> bool:
+        """Check if Gemini API key is available"""
+        return 'gemini' in self.ai_api_keys and self.ai_api_keys['gemini']
+    
+    def _has_openai_api(self) -> bool:
+        """Check if OpenAI API key is available"""
+        return 'openai' in self.ai_api_keys and self.ai_api_keys['openai']
+    
+    def _ai_enhance_watermark_removal(self, text: str) -> str:
+        """Use Gemini AI to enhance watermark removal for SAT documents"""
+        try:
+            if not self._has_gemini_api():
+                return None
+            
+            logger.info("Using Gemini AI to enhance watermark removal...")
+            
+            # Create prompt for Gemini
+            prompt = f"""
+            Analyze this SAT document text and identify watermarks to remove while preserving important content.
+            
+            Document text:
+            {text[:2000]}...
+            
+            Instructions:
+            1. Identify watermarks (headers, footers, page numbers, company names, etc.)
+            2. Identify important content to preserve (reading passages, questions, multiple choice options)
+            3. Return cleaned text with watermarks removed
+            
+            Return the cleaned text directly, no JSON formatting needed.
+            """
+            
+            # Use Gemini API
+            import google.generativeai as genai
+            genai.configure(api_key=self.ai_api_keys['gemini'])
+            model = genai.GenerativeModel('gemini-pro')
+            
+            response = model.generate_content(prompt)
+            cleaned_text = response.text
+            
+            if cleaned_text and len(cleaned_text) > 100:
+                logger.info("Gemini AI successfully enhanced watermark removal")
+                return cleaned_text
+            else:
+                logger.warning("Gemini AI response too short, using fallback")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Gemini AI enhancement failed: {e}")
+            return None
+    
+    def set_ai_api_key(self, provider: str, api_key: str):
+        """Set AI API key for a specific provider"""
+        if provider in self.ai_providers:
+            self.ai_api_keys[provider] = api_key
+            logger.info(f"API key set for {provider}")
+        else:
+            logger.warning(f"Unsupported AI provider: {provider}")
+    
+    def _extract_images_from_pdf(self, pdf_path: str) -> List[Dict]:
+        """Extract images from PDF with metadata"""
+        try:
+            images = []
+            doc = fitz.open(pdf_path)
+            
+            for page_num in range(len(doc)):
+                page = doc[page_num]
+                
+                # Get image list for this page
+                image_list = page.get_images()
+                
+                for img_index, img in enumerate(image_list):
+                    try:
+                        # Get image data
+                        xref = img[0]
+                        base_image = doc.extract_image(xref)
+                        image_bytes = base_image["image"]
+                        
+                        # Get image metadata
+                        img_rect = page.get_image_bbox(img)
+                        img_width = img_rect.width
+                        img_height = img_rect.height
+                        
+                        # Only process images above minimum size
+                        if img_width >= self.min_image_size and img_height >= self.min_image_size:
+                            image_info = {
+                                'page': page_num + 1,
+                                'index': img_index,
+                                'width': img_width,
+                                'height': img_height,
+                                'bbox': img_rect,
+                                'data': image_bytes,
+                                'format': base_image["ext"],
+                                'size': len(image_bytes)
+                            }
+                            images.append(image_info)
+                            
+                    except Exception as e:
+                        logger.warning(f"Failed to extract image {img_index} from page {page_num}: {e}")
+                        continue
+            
+            doc.close()
+            logger.info(f"Extracted {len(images)} images from PDF")
+            return images
+            
+        except Exception as e:
+            logger.error(f"Image extraction failed: {e}")
+            return []
+    
+    def train_on_document(self, document_path: str, user_feedback: Dict) -> bool:
+        """Train the watermark detector on a specific document with AI-powered enhancement"""
+        try:
+            logger.info(f"Training watermark detector on: {document_path}")
+            
+            # Extract text and images from document
+            text = self._extract_text_enhanced(document_path)
+            images = self._extract_images_from_pdf(document_path)
+            
+            # Get user feedback about what should/shouldn't be removed
+            watermarks_to_remove = user_feedback.get('remove', [])
+            content_to_preserve = user_feedback.get('preserve', [])
+            
+            # AI-powered pattern enhancement
+            if self.use_ai_training:
+                enhanced_patterns = self._ai_enhance_patterns(
+                    text, images, watermarks_to_remove, content_to_preserve
+                )
+                watermarks_to_remove.extend(enhanced_patterns.get('remove', []))
+                content_to_preserve.extend(enhanced_patterns.get('preserve', []))
+                logger.info(f"AI enhanced patterns: {len(enhanced_patterns.get('remove', []))} removal, {len(enhanced_patterns.get('preserve', []))} preservation")
+            
+            # Learn new patterns
+            new_patterns = self._learn_from_feedback(text, watermarks_to_remove, content_to_preserve)
+            
+            # Update trained patterns
+            self.trained_patterns.extend(new_patterns)
+            
+            # Save trained patterns
+            self._save_trained_patterns()
+            
+            logger.info(f"Training completed. New patterns learned: {len(new_patterns)}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Training failed: {e}")
+            return False
+    
+    def _learn_from_feedback(self, text: str, watermarks_to_remove: List[str], content_to_preserve: List[str]) -> List[str]:
+        """Learn new patterns from user feedback"""
+        new_patterns = []
+        
+        # Learn patterns for watermarks to remove
+        for watermark in watermarks_to_remove:
+            pattern = self._create_pattern_from_text(watermark)
+            if pattern:
+                new_patterns.append(pattern)
+                logger.info(f"Learned removal pattern: {pattern}")
+        
+        # Learn patterns for content to preserve (negative learning)
+        for content in content_to_preserve:
+            # Create a pattern that should NOT match
+            pattern = self._create_preservation_pattern(content)
+            if pattern:
+                new_patterns.append(pattern)
+                logger.info(f"Learned preservation pattern: {pattern}")
+        
+        return new_patterns
+    
+    def _create_pattern_from_text(self, text: str) -> str:
+        """Create a regex pattern from text for watermark detection"""
+        if not text or len(text) < 2:
+            return None
+        
+        # Escape special characters
+        escaped_text = re.escape(text)
+        
+        # Make it flexible for variations
+        pattern = f"\\b{escaped_text}\\b"
+        
+        return pattern
+    
+    def _create_preservation_pattern(self, text: str) -> str:
+        """Create a pattern that should preserve content"""
+        if not text or len(text) < 2:
+            return None
+        
+        # This is a negative pattern - we'll handle it specially
+        escaped_text = re.escape(text)
+        pattern = f"PRESERVE:{escaped_text}"
+        
+        return pattern
+    
+    def _load_trained_patterns(self):
+        """Load trained patterns from storage"""
+        try:
+            # For now, load from memory. In production, this would be from a database/file
+            # This is where you'd implement persistent storage
+            pass
+        except Exception as e:
+            logger.warning(f"Failed to load trained patterns: {e}")
+    
+    def _save_trained_patterns(self):
+        """Save trained patterns to storage"""
+        try:
+            # For now, save to memory. In production, this would be to a database/file
+            # This is where you'd implement persistent storage
+            pass
+        except Exception as e:
+            logger.warning(f"Failed to save trained patterns: {e}")
     
     def remove_watermarks_from_pdf(self, input_path: str, output_path: str) -> bool:
         """
@@ -165,19 +547,60 @@ class EnhancedWatermarkRemover:
             logger.warning(f"Enhanced text extraction failed, using basic: {e}")
             return page.get_text()
     
-    def _remove_watermarks_enhanced(self, text: str) -> str:
-        """Advanced watermark removal with automatic detection"""
+    def extract_text_from_pdf(self, pdf_path: str, max_pages: int = None) -> str:
+        """Extract text from PDF file with enhanced processing"""
         try:
-            logger.info("Starting automatic watermark detection and removal")
+            logger.info(f"Extracting text from PDF: {pdf_path}")
             
-            # Step 1: Analyze text structure and extract potential watermarks
+            # Open the PDF
+            doc = fitz.open(pdf_path)
+            
+            # Determine how many pages to process
+            if max_pages is None:
+                max_pages = len(doc)
+            else:
+                max_pages = min(max_pages, len(doc))
+            
+            # Extract text from each page
+            all_text = []
+            for page_num in range(max_pages):
+                page = doc[page_num]
+                page_text = self._extract_text_enhanced(page)
+                all_text.append(page_text)
+            
+            # Close the document
+            doc.close()
+            
+            # Combine all text
+            combined_text = "\n".join(all_text)
+            logger.info(f"Extracted {len(combined_text)} characters from {max_pages} pages")
+            
+            return combined_text
+            
+        except Exception as e:
+            logger.error(f"Text extraction from PDF failed: {e}")
+            return ""
+    
+    def _remove_watermarks_enhanced(self, text: str) -> str:
+        """Advanced watermark removal with automatic detection and AI enhancement"""
+        try:
+            logger.info("Starting automatic watermark detection and removal with AI")
+            
+            # Step 1: Use AI to enhance watermark detection if available
+            if self._has_gemini_api():
+                ai_enhanced_text = self._ai_enhance_watermark_removal(text)
+                if ai_enhanced_text:
+                    logger.info("AI-enhanced watermark removal completed")
+                    return ai_enhanced_text
+            
+            # Step 2: Analyze text structure and extract potential watermarks
             potential_watermarks = self._detect_watermarks_automatically(text)
             logger.info(f"Detected {len(potential_watermarks)} potential watermarks")
             
-            # Step 2: Remove detected watermarks
+            # Step 3: Remove detected watermarks
             cleaned_text = self._remove_detected_watermarks(text, potential_watermarks)
             
-            # Step 3: Clean up formatting
+            # Step 4: Clean up formatting
             cleaned_text = self._clean_text_formatting(cleaned_text)
             
             return cleaned_text
@@ -429,47 +852,267 @@ class SATDocumentProcessor:
         logger.info("SAT document processor initialized")
     
     def _initialize_sat_patterns(self):
-        """Initialize SAT-specific detection patterns"""
+        """Initialize enhanced SAT-specific detection patterns"""
         return {
+            'section_headers': [
+                r'^SAT\s+Practice\s+Test',  # "SAT Practice Test"
+                r'^(?:Section|Part)\s+\d+[:\s]*',  # "Section 1:" or "Part 1:"
+                r'^(?:Reading|Writing|Math|Language)\s+(?:Test|Section)[:\s]*',  # "Reading Test:" or "Math Section:"
+                r'^(?:Evidence-Based|Critical\s+Reading|Mathematics)[:\s]*',  # "Evidence-Based Reading:" or "Mathematics:"
+            ],
             'reading_passage': [
                 r'^Reading\s+Passage\s*\d+[:\s]*$',  # "Reading Passage 1:" at start of line
                 r'^Questions?\s*\d+[-\s]*\d*\s*are\s+based\s+on\s+the\s+following\s+passage$',  # "Questions 1-10 are based on the following passage"
                 r'^The\s+following\s+passage\s+is\s+adapted\s+from',  # "The following passage is adapted from..."
                 r'^Read\s+the\s+following\s+passage',  # "Read the following passage..."
+                # New patterns for SAT format
+                r'^The\s+unique\s+',  # "The unique subak water management system..."
+                r'^The\s+mihrab\s+',  # "The mihrab (or niche)..."
+                r'^The\s+Egyptian\s+',  # "The Egyptian plover..."
+                r'^Until\s+\d{4}',  # "Until 1917, there was no formal measure..."
+                r'^[A-Z][a-z]+\s+[a-z]+\s+[a-z]+\s+system',  # General pattern for passage starts
+                r'^[A-Z][a-z]+\s+[a-z]+\s+\([^)]+\)\s+is\s+one\s+of',  # "The mihrab (or niche) is one of..."
+                r'^[A-Z][a-z]+\s+[a-z]+-[a-z]+',  # "The Egyptian plover-a bird..."
             ],
             'question_start': [
                 r'^\s*\d+\.\s+',  # "1. " at start of line
                 r'^\s*Question\s+\d+[:\s]*',  # "Question 1:" or "Question 1"
                 r'^\s*Q\s*\d+[:\s]*',  # "Q1:" or "Q1"
+                r'^\s*\d+\s*$',  # "31" (standalone number)
+                r'^\s*\d+\s+[A-Z]',  # "31 A" (number followed by letter)
+                r'^\s*[A-Z]\s*$',  # "A" (standalone letter)
             ],
             'multiple_choice': [
                 r'^\s*[A-D]\)\s+',  # "A) ", "B) ", "C) ", "D) "
                 r'^\s*[A-D]\.\s+',  # "A. ", "B. ", "C. ", "D. "
                 r'^\s*[A-D]\s+',    # "A ", "B ", "C ", "D "
+                r'^\s*[A-D]\s*$',   # "A", "B", "C", "D" (standalone)
+                r'^\s*[A-D]\s*[A-Z]',  # "A A+", "B B+" (with additional text)
             ],
-            'section_header': [
-                r'^SAT\s+Practice\s+Test',  # "SAT Practice Test"
-                r'^(?:Section|Part)\s+\d+[:\s]*',  # "Section 1:" or "Part 1:"
-                r'^(?:Reading|Writing|Math|Language)\s+(?:Test|Section)[:\s]*',  # "Reading Test:" or "Math Section:"
-                r'^(?:Evidence-Based|Critical\s+Reading|Mathematics)[:\s]*',  # "Evidence-Based Reading:" or "Mathematics:"
+            'math_indicators': [
+                r'\b(?:function|equation|graph|slope|intercept|variable|solve|calculate|area|perimeter|volume|angle|triangle|rectangle|circle)\b',
+                r'[=+\-*/(){}[\]^]',  # Mathematical symbols
+                r'\b\d+\s*(?:times|multiplied by|divided by|plus|minus)\b',  # Word problems
+                r'\b(?:length|width|height|radius|diameter|base|height)\b',  # Geometry terms
+            ],
+            'reading_indicators': [
+                r'\b(?:passage|author|text|paragraph|line|suggests|implies|indicates|according to)\b',
+                r'\b(?:main idea|central theme|primary purpose|best describes)\b',
+                r'\b(?:inference|conclusion|implication|evidence)\b',
+                r'\b(?:vocabulary|word|phrase|meaning|definition)\b',
+            ],
+            'writing_indicators': [
+                r'\b(?:grammar|sentence|paragraph|transition|conclusion|introduction)\b',
+                r'\b(?:subject|verb|pronoun|agreement|tense|parallel)\b',
+                r'\b(?:no change|omit|delete|add|replace)\b',
+                r'[A-D]\)\s*(?:No change|omit|delete)',  # Writing section options
             ]
         }
     
+    def _classify_question_type(self, question_text: str, context: str = "") -> Dict:
+        """Classify SAT question type based on content analysis"""
+        try:
+            question_lower = question_text.lower()
+            context_lower = context.lower()
+            combined_text = f"{question_lower} {context_lower}"
+            
+            # Initialize classification
+            classification = {
+                'question_type': 'unknown',
+                'section_type': 'unknown',
+                'difficulty': 'medium',
+                'topic': 'general',
+                'format_requirements': []
+            }
+            
+            # Math question detection
+            math_score = 0
+            for pattern in self.sat_patterns['math_indicators']:
+                if re.search(pattern, combined_text, re.IGNORECASE):
+                    math_score += 1
+            
+            # Reading question detection
+            reading_score = 0
+            for pattern in self.sat_patterns['reading_indicators']:
+                if re.search(pattern, combined_text, re.IGNORECASE):
+                    reading_score += 1
+            
+            # Writing question detection
+            writing_score = 0
+            for pattern in self.sat_patterns['writing_indicators']:
+                if re.search(pattern, combined_text, re.IGNORECASE):
+                    writing_score += 1
+            
+            # Determine question type based on scores
+            if math_score > reading_score and math_score > writing_score:
+                classification['section_type'] = 'math'
+                classification['format_requirements'].append('preserve_math_notation')
+                
+                # Sub-classify math questions
+                if re.search(r'\b(?:function|equation|graph)\b', combined_text):
+                    classification['question_type'] = 'algebra'
+                    classification['topic'] = 'functions_and_equations'
+                elif re.search(r'\b(?:area|perimeter|volume|angle|triangle|rectangle|circle)\b', combined_text):
+                    classification['question_type'] = 'geometry'
+                    classification['topic'] = 'geometry'
+                elif re.search(r'\b(?:data|chart|graph|statistics|probability)\b', combined_text):
+                    classification['question_type'] = 'data_analysis'
+                    classification['topic'] = 'data_analysis'
+                else:
+                    classification['question_type'] = 'problem_solving'
+                    classification['topic'] = 'word_problems'
+                    
+            elif reading_score > writing_score:
+                classification['section_type'] = 'reading'
+                classification['format_requirements'].append('preserve_passage_structure')
+                
+                # Sub-classify reading questions
+                if re.search(r'\b(?:main idea|central theme|primary purpose)\b', combined_text):
+                    classification['question_type'] = 'main_idea'
+                    classification['topic'] = 'comprehension'
+                elif re.search(r'\b(?:according to|states|mentions)\b', combined_text):
+                    classification['question_type'] = 'detail'
+                    classification['topic'] = 'detail_retrieval'
+                elif re.search(r'\b(?:suggests|implies|indicates|inference)\b', combined_text):
+                    classification['question_type'] = 'inference'
+                    classification['topic'] = 'inference'
+                elif re.search(r'\b(?:vocabulary|word|phrase|meaning)\b', combined_text):
+                    classification['question_type'] = 'vocabulary'
+                    classification['topic'] = 'vocabulary_in_context'
+                elif re.search(r'\b(?:evidence|support|best evidence)\b', combined_text):
+                    classification['question_type'] = 'evidence'
+                    classification['topic'] = 'command_of_evidence'
+                else:
+                    classification['question_type'] = 'comprehension'
+                    classification['topic'] = 'general_comprehension'
+                    
+            elif writing_score > 0:
+                classification['section_type'] = 'writing'
+                classification['format_requirements'].append('maintain_line_numbers')
+                
+                # Sub-classify writing questions
+                if re.search(r'\b(?:grammar|subject|verb|pronoun|agreement)\b', combined_text):
+                    classification['question_type'] = 'grammar'
+                    classification['topic'] = 'grammar_and_usage'
+                elif re.search(r'\b(?:sentence|paragraph|transition|organization)\b', combined_text):
+                    classification['question_type'] = 'expression'
+                    classification['topic'] = 'expression_of_ideas'
+                else:
+                    classification['question_type'] = 'editing'
+                    classification['topic'] = 'standard_english_conventions'
+            
+            # Determine difficulty based on question complexity
+            if len(question_text) > 100 or re.search(r'\b(?:complex|advanced|sophisticated)\b', combined_text):
+                classification['difficulty'] = 'hard'
+            elif len(question_text) < 50:
+                classification['difficulty'] = 'easy'
+            
+            logger.info(f"Question classified as: {classification['section_type']} - {classification['question_type']}")
+            return classification
+            
+        except Exception as e:
+            logger.warning(f"Question classification failed: {e}")
+            return {
+                'question_type': 'unknown',
+                'section_type': 'unknown',
+                'difficulty': 'medium',
+                'topic': 'general',
+                'format_requirements': []
+            }
+    
+    def _ai_enhance_sat_structure_detection(self, text: str) -> Dict:
+        """Use Gemini AI to enhance SAT structure detection"""
+        try:
+            if not self.watermark_remover._has_gemini_api():
+                return None
+            
+            logger.info("Using Gemini AI to enhance SAT structure detection...")
+            
+            # Create prompt for Gemini
+            prompt = f"""
+            Analyze this SAT document text and identify the structure with exact formatting.
+            
+            Document text:
+            {text[:3000]}...
+            
+            Instructions:
+            1. Identify reading passages (long text blocks before questions)
+            2. Identify questions (numbered items that ask something)
+            3. Identify multiple choice options (A, B, C, D choices)
+            4. Return the structure in this exact format:
+            
+            {{
+                "reading_passages": [
+                    {{
+                        "text": "passage title or first line",
+                        "content": ["line 1", "line 2", "line 3"]
+                    }}
+                ],
+                "questions": [
+                    {{
+                        "text": "question text",
+                        "content": ["question content"],
+                        "choices": [
+                            {{"text": "A) choice text"}},
+                            {{"text": "B) choice text"}},
+                            {{"text": "C) choice text"}},
+                            {{"text": "D) choice text"}}
+                        ]
+                    }}
+                ]
+            }}
+            
+            Focus on the exact format above. Return valid JSON only.
+            """
+            
+            # Use Gemini API
+            import google.generativeai as genai
+            genai.configure(api_key=self.watermark_remover.ai_api_keys['gemini'])
+            model = genai.GenerativeModel('gemini-pro')
+            
+            response = model.generate_content(prompt)
+            ai_response = response.text
+            
+            # Parse AI response
+            try:
+                import json
+                result = json.loads(ai_response)
+                
+                # Validate structure
+                if 'reading_passages' in result and 'questions' in result:
+                    logger.info("Gemini AI successfully enhanced SAT structure detection")
+                    return result
+                else:
+                    logger.warning("Gemini AI response missing required fields")
+                    return None
+                    
+            except json.JSONDecodeError as e:
+                logger.warning(f"Failed to parse Gemini AI response as JSON: {e}")
+                return None
+                
+        except Exception as e:
+            logger.warning(f"Gemini AI enhancement failed: {e}")
+            return None
+    
     def process_sat_document(self, input_path: str) -> str:
-        """Process SAT document with format detection and preservation"""
+        """Process SAT document with format detection, image preservation, and watermark removal"""
         try:
             logger.info(f"Processing SAT document: {input_path}")
             
             # Extract text with watermark removal
-            text = self.watermark_remover._extract_text_enhanced(input_path)
+            text = self.watermark_remover.extract_text_from_pdf(input_path)
             logger.info(f"Extracted text length: {len(text)} characters")
             
-            # Detect SAT structure
-            sat_structure = self._detect_sat_structure(text)
-            logger.info(f"Detected SAT structure: {sat_structure}")
+            # Extract images for integration
+            images = self.watermark_remover._extract_images_from_pdf(input_path)
+            logger.info(f"Extracted {len(images)} images from document")
             
-            # Process and format for Word
-            formatted_text = self._format_sat_for_word(text, sat_structure)
+            # Detect SAT structure with image integration
+            sat_structure = self._detect_sat_structure_with_images(text, images)
+            logger.info(f"Detected SAT structure with images: {sat_structure}")
+            
+            # Process and format for Word with images
+            formatted_text = self._format_sat_for_word_with_images(text, sat_structure, images)
             
             return formatted_text
             
@@ -477,87 +1120,200 @@ class SATDocumentProcessor:
             logger.error(f"SAT document processing failed: {e}")
             raise
     
+    def process_sat_document_english(self, input_path: str) -> str:
+        """Process SAT document specifically for English section (text processing focus)"""
+        try:
+            logger.info(f"Processing SAT document for English section: {input_path}")
+            
+            # Extract text with enhanced watermark removal for English
+            text = self.watermark_remover.extract_text_from_pdf(input_path)
+            logger.info(f"Extracted text length: {len(text)} characters")
+            
+            # Extract images for integration
+            images = self.watermark_remover._extract_images_from_pdf(input_path)
+            logger.info(f"Extracted {len(images)} images from document")
+            
+            # Detect SAT structure with image integration
+            sat_structure = self._detect_sat_structure_with_images(text, images)
+            logger.info(f"Detected SAT structure with images: {sat_structure}")
+            
+            # Process and format for Word with English section focus
+            formatted_text = self._format_sat_for_word_english(text, sat_structure, images)
+            
+            return formatted_text
+            
+        except Exception as e:
+            logger.error(f"SAT document processing for English section failed: {e}")
+            raise
+    
+    def process_sat_document_math(self, input_path: str) -> str:
+        """Process SAT document specifically for Math section (LaTeX conversion focus)"""
+        try:
+            logger.info(f"Processing SAT document for Math section: {input_path}")
+            
+            # Extract text with enhanced watermark removal for Math
+            text = self.watermark_remover.extract_text_from_pdf(input_path)
+            logger.info(f"Extracted text length: {len(text)} characters")
+            
+            # Extract images for integration
+            images = self.watermark_remover._extract_images_from_pdf(input_path)
+            logger.info(f"Extracted {len(text)} images from document")
+            
+            # Detect SAT structure with image integration
+            sat_structure = self._detect_sat_structure_with_images(text, images)
+            logger.info(f"Detected SAT structure with images: {sat_structure}")
+            
+            # Process and format for Word with Math section focus (LaTeX conversion)
+            formatted_text = self._format_sat_for_word_math(text, sat_structure, images)
+            
+            return formatted_text
+            
+        except Exception as e:
+            logger.error(f"SAT document processing for Math section failed: {e}")
+            raise
+    
     def _detect_sat_structure(self, text: str) -> Dict:
-        """Detect SAT document structure and components"""
-        lines = text.split('\n')
-        structure = {
-            'reading_passages': [],
-            'questions': [],
-            'multiple_choices': [],
-            'sections': [],
-            'format_type': 'unknown'
-        }
-        
-        current_section = None
-        current_passage = None
-        current_question = None
-        
-        for i, line in enumerate(lines):
-            line = line.strip()
-            if not line:
-                continue
+        """Detect SAT document structure and components with enhanced classification"""
+        try:
+            lines = text.split('\n')
+            structure = {
+                'sections': [],
+                'reading_passages': [],
+                'questions': [],
+                'document_type': 'unknown',
+                'total_questions': 0
+            }
             
-            # Detect section headers
-            if self._matches_pattern(line, self.sat_patterns['section_header']):
-                current_section = line
-                structure['sections'].append({
-                    'type': 'section_header',
-                    'text': line,
-                    'line_number': i
-                })
-                continue
+            current_passage = None
+            current_question = None
+            question_counter = 0
             
-            # Detect reading passages
-            if self._matches_pattern(line, self.sat_patterns['reading_passage']):
-                current_passage = {
-                    'start_line': i,
-                    'text': line,
-                    'questions': []
-                }
+            for i, line in enumerate(lines):
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Detect section headers
+                if self._matches_pattern(line, self.sat_patterns['section_headers']):
+                    structure['sections'].append({
+                        'text': line,
+                        'line_number': i,
+                        'section_type': self._classify_section_type(line)
+                    })
+                
+                # Detect reading passages
+                elif self._matches_pattern(line, self.sat_patterns['reading_passage']):
+                    if current_passage:
+                        structure['reading_passages'].append(current_passage)
+                    current_passage = {
+                        'text': line,
+                        'content': [],
+                        'line_number': i,
+                        'passage_type': 'reading'
+                    }
+                
+                # Detect questions
+                elif self._matches_pattern(line, self.sat_patterns['question_start']):
+                    if current_question:
+                        # Classify the question before adding
+                        question_classification = self._classify_question_type(
+                            current_question['text'], 
+                            ' '.join(current_question['content'])
+                        )
+                        current_question.update(question_classification)
+                        structure['questions'].append(current_question)
+                        question_counter += 1
+                    
+                    current_question = {
+                        'text': line,
+                        'content': [],
+                        'choices': [],
+                        'line_number': i,
+                        'question_number': question_counter + 1
+                    }
+                
+                # Detect multiple choice options
+                elif self._matches_pattern(line, self.sat_patterns['multiple_choice']):
+                    if current_question:
+                        # Clean up the choice text
+                        choice_text = re.sub(r'^[A-D][\)\.\s]*', '', line)
+                        choice_text = re.sub(r'\s*[A-Z]+\s*$', '', choice_text)  # Remove trailing letters like "A+"
+                        choice_text = choice_text.strip()
+                        
+                        if choice_text:  # Only add if there's actual content
+                            current_question['choices'].append({
+                                'text': choice_text,
+                                'option': line[0] if line else 'A',
+                                'is_correct': False
+                            })
+                        continue
+                
+                # Add content to current passage or question
+                else:
+                    if current_passage:
+                        current_passage['content'].append(line)
+                    elif current_question:
+                        current_question['content'].append(line)
+            
+            # Add final passage and question
+            if current_passage:
                 structure['reading_passages'].append(current_passage)
-                continue
-            
-            # Detect questions
-            if self._matches_pattern(line, self.sat_patterns['question_start']):
-                current_question = {
-                    'start_line': i,
-                    'text': line,
-                    'choices': [],
-                    'passage_ref': current_passage
-                }
+            if current_question:
+                # Classify the final question
+                question_classification = self._classify_question_type(
+                    current_question['text'], 
+                    ' '.join(current_question['content'])
+                )
+                current_question.update(question_classification)
                 structure['questions'].append(current_question)
-                continue
+                question_counter += 1
             
-            # Detect multiple choice options
-            if current_question and self._matches_pattern(line, self.sat_patterns['multiple_choice']):
-                current_question['choices'].append({
-                    'text': line,
-                    'choice': line[0].upper(),
-                    'line_number': i
-                })
-                continue
+            # Determine overall document type
+            structure['total_questions'] = question_counter
+            structure['document_type'] = self._determine_document_type(structure)
             
-            # If we have a current passage, add lines to it
-            if current_passage and not current_question:
-                if 'content' not in current_passage:
-                    current_passage['content'] = []
-                current_passage['content'].append(line)
+            logger.info(f"Detected {len(structure['sections'])} sections, {len(structure['reading_passages'])} passages, {len(structure['questions'])} questions")
+            logger.info(f"Document type: {structure['document_type']}")
+            return structure
             
-            # If we have a current question, add lines to it
-            if current_question and not self._matches_pattern(line, self.sat_patterns['multiple_choice']):
-                if 'content' not in current_question:
-                    current_question['content'] = []
-                current_question['content'].append(line)
-        
-        # Determine format type
-        if structure['reading_passages'] and structure['questions']:
-            structure['format_type'] = 'reading_comprehension'
-        elif structure['questions'] and structure['multiple_choices']:
-            structure['format_type'] = 'multiple_choice'
+        except Exception as e:
+            logger.error(f"SAT structure detection failed: {e}")
+            return {'sections': [], 'reading_passages': [], 'questions': [], 'document_type': 'unknown', 'total_questions': 0}
+    
+    def _classify_section_type(self, section_text: str) -> str:
+        """Classify section type based on header text"""
+        section_lower = section_text.lower()
+        if 'math' in section_lower or 'mathematics' in section_lower:
+            return 'math'
+        elif 'reading' in section_lower or 'evidence' in section_lower:
+            return 'reading'
+        elif 'writing' in section_lower or 'language' in section_lower:
+            return 'writing'
         else:
-            structure['format_type'] = 'mixed'
+            return 'general'
+    
+    def _determine_document_type(self, structure: Dict) -> str:
+        """Determine overall document type based on structure analysis"""
+        if not structure['questions']:
+            return 'unknown'
         
-        return structure
+        # Count question types
+        math_questions = sum(1 for q in structure['questions'] if q.get('section_type') == 'math')
+        reading_questions = sum(1 for q in structure['questions'] if q.get('section_type') == 'reading')
+        writing_questions = sum(1 for q in structure['questions'] if q.get('section_type') == 'writing')
+        
+        total = len(structure['questions'])
+        
+        if math_questions > total * 0.6:
+            return 'math_focused'
+        elif reading_questions > total * 0.6:
+            return 'reading_focused'
+        elif writing_questions > total * 0.6:
+            return 'writing_focused'
+        elif math_questions > 0 and reading_questions > 0:
+            return 'mixed_sat'
+        else:
+            return 'general'
     
     def _matches_pattern(self, text: str, patterns: List[str]) -> bool:
         """Check if text matches any of the given patterns"""
@@ -577,35 +1333,385 @@ class SATDocumentProcessor:
         
         # Process sections
         for section in structure['sections']:
-            formatted_lines.append(f"**{section['text']}**")
+            formatted_lines.append(f"**SECTION_HEADER:{section['text']}**")
             formatted_lines.append("")
         
-        # Process reading passages
+        # Process reading passages with proper structure
         for passage in structure['reading_passages']:
-            formatted_lines.append(f"**{passage['text']}**")
+            formatted_lines.append(f"**READING_PASSAGE:{passage['text']}**")
             formatted_lines.append("")
             
             if 'content' in passage:
                 for line in passage['content']:
-                    formatted_lines.append(line)
+                    formatted_lines.append(f"PASSAGE_CONTENT:{line}")
                 formatted_lines.append("")
         
-        # Process questions
+        # Process questions with proper structure
         for question in structure['questions']:
-            formatted_lines.append(f"**{question['text']}**")
+            formatted_lines.append(f"**QUESTION:{question['text']}**")
+            
+            # Add question content if any
             if 'content' in question:
                 for line in question['content']:
-                    formatted_lines.append(line)
+                    formatted_lines.append(f"QUESTION_CONTENT:{line}")
             
-            # Add multiple choice options
+            # Add multiple choice options with proper formatting
             if question['choices']:
                 formatted_lines.append("")
                 for choice in question['choices']:
-                    formatted_lines.append(f"  {choice['text']}")
+                    formatted_lines.append(f"MULTIPLE_CHOICE:{choice['text']}")
                 formatted_lines.append("")
         
         return '\n'.join(formatted_lines)
-
+    
+    def _detect_sat_structure_with_images(self, text: str, images: List[Dict]) -> Dict:
+        """Detect SAT structure with image integration and AI enhancement"""
+        try:
+            # Use AI to enhance structure detection if available
+            if self.watermark_remover._has_gemini_api():
+                ai_enhanced_structure = self._ai_enhance_sat_structure_detection(text)
+                if ai_enhanced_structure:
+                    logger.info("AI-enhanced SAT structure detection completed")
+                    # Integrate images with AI-enhanced structure
+                    for passage in ai_enhanced_structure['reading_passages']:
+                        passage['images'] = []
+                        for image in images:
+                            if self._image_belongs_to_passage(image, passage):
+                                passage['images'].append(image)
+                    return ai_enhanced_structure
+            
+            # Fallback to basic structure detection
+            structure = self._detect_sat_structure(text)
+            
+            # Integrate images into reading passages
+            for passage in structure['reading_passages']:
+                passage['images'] = []
+                
+                # Find images that belong to this passage
+                for image in images:
+                    # Simple heuristic: images on the same page as passage content
+                    if self._image_belongs_to_passage(image, passage):
+                        passage['images'].append(image)
+                        logger.info(f"Image {image['index']} integrated into passage: {passage['text']}")
+            
+            return structure
+            
+        except Exception as e:
+            logger.error(f"AI-enhanced SAT structure detection failed: {e}")
+            # Fallback to basic detection
+            return self._detect_sat_structure(text)
+    
+    def _image_belongs_to_passage(self, image: Dict, passage: Dict) -> bool:
+        """Determine if an image belongs to a specific passage"""
+        # Simple heuristic: image is on the same page as passage content
+        # In a more sophisticated system, you could use OCR to detect image captions
+        # or analyze image position relative to text blocks
+        
+        if 'start_line' in passage:
+            # Estimate page number from line number (assuming ~50 lines per page)
+            estimated_page = passage['start_line'] // 50 + 1
+            return image['page'] == estimated_page
+        
+        return False
+    
+    def _format_sat_for_word_with_images(self, text: str, structure: Dict, images: List[Dict]) -> str:
+        """Format SAT content for Word document with image integration"""
+        formatted_lines = []
+        
+        # Add title
+        formatted_lines.append("SAT Practice Test")
+        formatted_lines.append("=" * 50)
+        formatted_lines.append("")
+        
+        # Process sections
+        for section in structure['sections']:
+            formatted_lines.append(f"**SECTION_HEADER:{section['text']}**")
+            formatted_lines.append("")
+        
+        # Process reading passages with images
+        for passage in structure['reading_passages']:
+            formatted_lines.append(f"**READING_PASSAGE:{passage['text']}**")
+            formatted_lines.append("")
+            
+            # Add passage content
+            if 'content' in passage:
+                for line in passage['content']:
+                    formatted_lines.append(f"PASSAGE_CONTENT:{line}")
+                formatted_lines.append("")
+            
+            # Add images associated with this passage
+            if 'images' in passage and passage['images']:
+                formatted_lines.append("**PASSAGE_IMAGES:**")
+                for image in passage['images']:
+                    formatted_lines.append(f"IMAGE_PLACEHOLDER:Page {image['page']}, Image {image['index']} ({image['width']}x{image['height']})")
+                formatted_lines.append("")
+        
+        # Process questions with proper structure
+        for question in structure['questions']:
+            formatted_lines.append(f"**QUESTION:{question['text']}**")
+            
+            # Add question content if any
+            if 'content' in question:
+                for line in question['content']:
+                    formatted_lines.append(f"QUESTION_CONTENT:{line}")
+            
+            # Add multiple choice options with proper formatting
+            if question['choices']:
+                formatted_lines.append("")
+                for choice in question['choices']:
+                    formatted_lines.append(f"MULTIPLE_CHOICE:{choice['text']}")
+                formatted_lines.append("")
+        
+        return '\n'.join(formatted_lines)
+    
+    def _format_sat_for_word_english(self, text: str, structure: Dict, images: List[Dict]) -> str:
+        """Format SAT content for Word document with English section focus (text processing)"""
+        formatted_lines = []
+        
+        # Add document metadata
+        formatted_lines.append(f"- document type : {structure.get('document_type', 'unknown')}")
+        formatted_lines.append(f"+Total Questions: {structure.get('total_questions', 0)}")
+        formatted_lines.append("")
+        
+        # Process reading passages with exact format
+        for passage in structure['reading_passages']:
+            formatted_lines.append("- reading passage :")
+            if 'content' in passage and passage['content']:
+                for line in passage['content']:
+                    formatted_lines.append(f"+{line}")
+            else:
+                # If no specific content, use the passage text
+                formatted_lines.append(f"+{passage['text']}")
+            formatted_lines.append("")
+        
+        # Process questions with exact format and enhanced classification
+        for question in structure['questions']:
+            # Add question metadata
+            question_type = question.get('question_type', 'unknown')
+            section_type = question.get('section_type', 'unknown')
+            difficulty = question.get('difficulty', 'medium')
+            topic = question.get('topic', 'general')
+            
+            formatted_lines.append(f"- question type : {question_type}")
+            formatted_lines.append(f"+Section: {section_type}")
+            formatted_lines.append(f"+Difficulty: {difficulty}")
+            formatted_lines.append(f"+Topic: {topic}")
+            formatted_lines.append("")
+            
+            formatted_lines.append("- question:")
+            if 'content' in question and question['content']:
+                for line in question['content']:
+                    formatted_lines.append(f"+{line}")
+            else:
+                # If no specific content, use the question text
+                formatted_lines.append(f"+{question['text']}")
+            formatted_lines.append("")
+            
+            # Add multiple choice options with exact format
+            if question['choices']:
+                formatted_lines.append("- options")
+                for choice in question['choices']:
+                    formatted_lines.append(f"+{choice['option']}) {choice['text']}")
+                formatted_lines.append("")
+        
+        return '\n'.join(formatted_lines)
+    
+    def _format_sat_for_word_math(self, text: str, structure: Dict, images: List[Dict]) -> str:
+        """Format SAT content for Word document with Math section focus (LaTeX conversion)"""
+        formatted_lines = []
+        
+        # Add document metadata
+        formatted_lines.append(f"- document type : {structure.get('document_type', 'unknown')}")
+        formatted_lines.append(f"+Total Questions: {structure.get('total_questions', 0)}")
+        formatted_lines.append("")
+        
+        # Process reading passages with exact format
+        for passage in structure['reading_passages']:
+            formatted_lines.append("- reading passage :")
+            if 'content' in passage and passage['content']:
+                for line in passage['content']:
+                    # Convert math expressions to LaTeX format
+                    latex_line = self._convert_math_to_latex(line)
+                    formatted_lines.append(f"+{latex_line}")
+            else:
+                # If no specific content, use the passage text
+                latex_text = self._convert_math_to_latex(passage['text'])
+                formatted_lines.append(f"+{latex_text}")
+            formatted_lines.append("")
+        
+        # Process questions with exact format and enhanced classification
+        for question in structure['questions']:
+            # Add question metadata
+            question_type = question.get('question_type', 'unknown')
+            section_type = question.get('section_type', 'unknown')
+            difficulty = question.get('difficulty', 'medium')
+            topic = question.get('topic', 'general')
+            
+            formatted_lines.append(f"- question type : {question_type}")
+            formatted_lines.append(f"+Section: {section_type}")
+            formatted_lines.append(f"+Difficulty: {difficulty}")
+            formatted_lines.append(f"+Topic: {topic}")
+            formatted_lines.append("")
+            
+            formatted_lines.append("- question:")
+            if 'content' in question and question['content']:
+                for line in question['content']:
+                    # Convert math expressions to LaTeX format
+                    latex_line = self._convert_math_to_latex(line)
+                    formatted_lines.append(f"+{latex_line}")
+            else:
+                # If no specific content, use the question text
+                latex_text = self._convert_math_to_latex(question['text'])
+                formatted_lines.append(f"+{latex_text}")
+            formatted_lines.append("")
+            
+            # Add multiple choice options with exact format
+            if question['choices']:
+                formatted_lines.append("- options")
+                for choice in question['choices']:
+                    # Convert math expressions in choices to LaTeX format
+                    latex_choice = self._convert_math_to_latex(choice['text'])
+                    formatted_lines.append(f"+{choice['option']}) {latex_choice}")
+                formatted_lines.append("")
+        
+        return '\n'.join(formatted_lines)
+    
+    def _convert_math_to_latex(self, text: str) -> str:
+        """Convert math expressions to LaTeX format using pdftolatex approach"""
+        try:
+            if not text or not isinstance(text, str):
+                return text
+            
+            # Common math patterns to convert to LaTeX
+            latex_text = text
+            
+            # Convert fractions: 1/2 -> \frac{1}{2}
+            latex_text = re.sub(r'(\d+)/(\d+)', r'\\frac{\1}{\2}', latex_text)
+            
+            # Convert exponents: x^2 -> x^{2}, x^y -> x^{y}
+            latex_text = re.sub(r'(\w+)\^(\d+)', r'\1^{\2}', latex_text)
+            latex_text = re.sub(r'(\w+)\^(\w+)', r'\1^{\2}', latex_text)
+            
+            # Convert square roots: sqrt(x) -> \sqrt{x}
+            latex_text = re.sub(r'sqrt\(([^)]+)\)', r'\\sqrt{\1}', latex_text)
+            
+            # Convert Greek letters and common symbols
+            latex_text = re.sub(r'\bpi\b', r'\\pi', latex_text)
+            latex_text = re.sub(r'\btheta\b', r'\\theta', latex_text)
+            latex_text = re.sub(r'\balpha\b', r'\\alpha', latex_text)
+            latex_text = re.sub(r'\bbeta\b', r'\\beta', latex_text)
+            latex_text = re.sub(r'\bgamma\b', r'\\gamma', latex_text)
+            latex_text = re.sub(r'\bdelta\b', r'\\delta', latex_text)
+            latex_text = re.sub(r'\bepsilon\b', r'\\epsilon', latex_text)
+            latex_text = re.sub(r'\blambda\b', r'\\lambda', latex_text)
+            latex_text = re.sub(r'\bmu\b', r'\\mu', latex_text)
+            latex_text = re.sub(r'\bsigma\b', r'\\sigma', latex_text)
+            latex_text = re.sub(r'\btau\b', r'\\tau', latex_text)
+            latex_text = re.sub(r'\bphi\b', r'\\phi', latex_text)
+            latex_text = re.sub(r'\bomega\b', r'\\omega', latex_text)
+            
+            # Convert infinity symbol
+            latex_text = re.sub(r'\binfinity\b', r'\\infty', latex_text)
+            latex_text = re.sub(r'∞', r'\\infty', latex_text)
+            
+            # Convert mathematical operators
+            latex_text = re.sub(r'\btimes\b', r'\\times', latex_text)
+            latex_text = re.sub(r'\bdiv\b', r'\\div', latex_text)
+            latex_text = re.sub(r'\bplus\b', r'+', latex_text)
+            latex_text = re.sub(r'\bminus\b', r'-', latex_text)
+            
+            # Convert inequalities
+            latex_text = re.sub(r'<=', r'\\leq', latex_text)
+            latex_text = re.sub(r'>=', r'\\geq', latex_text)
+            latex_text = re.sub(r'<', r'<', latex_text)
+            latex_text = re.sub(r'>', r'>', latex_text)
+            
+            # Convert set notation
+            latex_text = re.sub(r'\bin\b', r'\\in', latex_text)
+            latex_text = re.sub(r'\bnotin\b', r'\\notin', latex_text)
+            latex_text = re.sub(r'\bsubset\b', r'\\subset', latex_text)
+            latex_text = re.sub(r'\bsupset\b', r'\\supset', latex_text)
+            latex_text = re.sub(r'\bunion\b', r'\\cup', latex_text)
+            latex_text = re.sub(r'\bintersection\b', r'\\cap', latex_text)
+            
+            # Convert logical operators
+            latex_text = re.sub(r'\band\b', r'\\land', latex_text)
+            latex_text = re.sub(r'\bor\b', r'\\lor', latex_text)
+            latex_text = re.sub(r'\bnot\b', r'\\neg', latex_text)
+            
+            # Convert function notation: f(x) -> f(x) (already correct)
+            # Convert limits: lim x->0 -> \lim_{x \to 0}
+            latex_text = re.sub(r'lim\s+(\w+)\s*->\s*(\w+)', r'\\lim_{\1 \\to \2}', latex_text)
+            
+            # Convert integrals: int -> \int
+            latex_text = re.sub(r'\bint\b', r'\\int', latex_text)
+            
+            # Convert summations: sum -> \sum
+            latex_text = re.sub(r'\bsum\b', r'\\sum', latex_text)
+            
+            # Convert products: prod -> \prod
+            latex_text = re.sub(r'\bprod\b', r'\\prod', latex_text)
+            
+            # Convert absolute value: |x| -> |x| (already correct)
+            
+            # Convert matrices: [a b; c d] -> \begin{matrix} a & b \\ c & d \end{matrix}
+            matrix_pattern = r'\[([^]]+)\]'
+            def replace_matrix(match):
+                content = match.group(1)
+                if ';' in content:  # Matrix with semicolon separator
+                    rows = content.split(';')
+                    matrix_content = ' \\\\ '.join([row.strip().replace(' ', ' & ') for row in rows])
+                    return f'\\begin{{matrix}} {matrix_content} \\end{{matrix}}'
+                return match.group(0)  # Return as-is if not a matrix
+            
+            latex_text = re.sub(matrix_pattern, replace_matrix, latex_text)
+            
+            # Convert vectors: <a,b> -> \langle a, b \rangle
+            latex_text = re.sub(r'<([^>]+)>', r'\\langle \1 \\rangle', latex_text)
+            
+            # Convert degrees: 90° -> 90°
+            latex_text = re.sub(r'(\d+)°', r'\1°', latex_text)
+            
+            # Convert percentages: 50% -> 50\%
+            latex_text = re.sub(r'(\d+)%', r'\1\\%', latex_text)
+            
+            # Convert common functions
+            latex_text = re.sub(r'\bsin\b', r'\\sin', latex_text)
+            latex_text = re.sub(r'\bcos\b', r'\\cos', latex_text)
+            latex_text = re.sub(r'\btan\b', r'\\tan', latex_text)
+            latex_text = re.sub(r'\blog\b', r'\\log', latex_text)
+            latex_text = re.sub(r'\bln\b', r'\\ln', latex_text)
+            latex_text = re.sub(r'\bexp\b', r'\\exp', latex_text)
+            
+            # Convert natural log: ln(x) -> \ln(x)
+            latex_text = re.sub(r'ln\(([^)]+)\)', r'\\ln(\1)', latex_text)
+            
+            # Convert log base: log_2(x) -> \log_2(x)
+            latex_text = re.sub(r'log_(\w+)\(([^)]+)\)', r'\\log_{\1}(\2)', latex_text)
+            
+            # Convert complex expressions with parentheses
+            # Handle nested expressions like f(x) = 2x + 1
+            latex_text = re.sub(r'f\((\w+)\)\s*=\s*([^=]+)', r'f(\1) = \2', latex_text)
+            
+            # Convert domain and range notation: [a,b] -> [a,b] (already correct)
+            # Convert open intervals: (a,b) -> (a,b) (already correct)
+            
+            # Convert complex numbers: a + bi -> a + bi (already correct)
+            latex_text = re.sub(r'(\d+)\s*\+\s*(\d+)i', r'\1 + \2i', latex_text)
+            
+            # Convert scientific notation: 1.5e10 -> 1.5 \times 10^{10}
+            latex_text = re.sub(r'(\d+\.?\d*)[eE](\d+)', r'\1 \\times 10^{\2}', latex_text)
+            
+            # Clean up multiple spaces
+            latex_text = re.sub(r'\s+', ' ', latex_text).strip()
+            
+            logger.info(f"Converted math expression: '{text}' -> '{latex_text}'")
+            return latex_text
+            
+        except Exception as e:
+            logger.warning(f"LaTeX conversion failed for '{text}': {e}")
+            return text
+    
 
 class DocumentProcessor:
     """Enhanced document processing with SAT support"""
@@ -620,11 +1726,12 @@ class DocumentProcessor:
         try:
             logger.info(f"Processing {file_path} with section type: {section_type}")
             
-            # Check if this is a SAT document first
-            if self._is_sat_document(file_path):
+            # Check if this is a SAT document first (for both English and Math sections)
+            is_sat = self._is_sat_document(file_path)
+            if is_sat:
                 logger.info("SAT document detected - using specialized processor")
-                word_path = self._convert_sat_to_word(file_path, file_path)
-                section_type = 'sat'  # Override section type for SAT
+                word_path = self._convert_sat_to_word(file_path, file_path, section_type)
+                section_type = f'sat_{section_type}'  # Mark as SAT with section type
             else:
                 # Direct conversion from original PDF with watermark removal in text processing
                 if section_type == 'math':
@@ -640,7 +1747,7 @@ class DocumentProcessor:
                 'processing_time': time.time(),
                 'watermark_removal': 'completed',
                 'word_conversion': 'completed',
-                'sat_detection': 'completed' if section_type == 'sat' else 'not_applicable'
+                'sat_detection': 'completed' if is_sat else 'not_applicable'
             }
             
             return word_path, metadata
@@ -677,13 +1784,16 @@ class DocumentProcessor:
         # If more than 3 indicators found, likely SAT document
         return indicator_count >= 3
     
-    def _convert_sat_to_word(self, pdf_path: str, original_filename: str) -> str:
-        """Convert SAT PDF to Word document with format preservation"""
-        logger.info("Converting SAT document to Word with format preservation...")
+    def _convert_sat_to_word(self, pdf_path: str, original_filename: str, section_type: str = 'english') -> str:
+        """Convert SAT PDF to Word document with format preservation for specific section"""
+        logger.info(f"Converting SAT document to Word with {section_type} section processing...")
         
         try:
-            # Process SAT document through specialized processor
-            formatted_text = self.sat_processor.process_sat_document(pdf_path)
+            # Process SAT document through specialized processor with section-specific handling
+            if section_type == 'math':
+                formatted_text = self.sat_processor.process_sat_document_math(pdf_path)
+            else:
+                formatted_text = self.sat_processor.process_sat_document_english(pdf_path)
             
             # Create Word document
             word_doc = Document()
@@ -707,41 +1817,73 @@ class DocumentProcessor:
             # Add separator
             word_doc.add_paragraph("=" * 50)
             
-            # Process formatted text
+            # Process formatted text with enhanced SAT format
             lines = formatted_text.split('\n')
-            current_heading_level = 1
             
             for line in lines:
                 line = line.strip()
                 if not line:
                     continue
                 
-                # Check for section headers
-                if line.startswith('**') and line.endswith('**'):
-                    # Remove markdown formatting
-                    clean_text = line[2:-2]
-                    if 'passage' in clean_text.lower():
-                        word_doc.add_heading(clean_text, level=1)
-                    elif 'section' in clean_text.lower():
-                        word_doc.add_heading(clean_text, level=1)
-                    else:
-                        word_doc.add_heading(clean_text, level=2)
+                # Process document metadata
+                if line.startswith("- document type :"):
+                    metadata_text = line.replace("- document type :", "").strip()
+                    heading = word_doc.add_heading(f"Document Type: {metadata_text}", level=1)
+                    heading.style.font.bold = True
+                    heading.style.font.color.rgb = RGBColor(0, 0, 0)  # Black
                     continue
                 
-                # Check for question numbers
-                if re.match(r'^\d+\.', line):
-                    word_doc.add_heading(line, level=3)
+                # Process question type metadata
+                if line.startswith("- question type :"):
+                    question_type = line.replace("- question type :", "").strip()
+                    heading = word_doc.add_heading(f"Question Type: {question_type}", level=4)
+                    heading.style.font.bold = True
+                    heading.style.font.color.rgb = RGBColor(128, 0, 128)  # Purple
                     continue
                 
-                # Check for multiple choice options
-                if re.match(r'^\s*[A-D][\)\.]\s*', line):
-                    # Indent multiple choice options
-                    para = word_doc.add_paragraph(line)
-                    para.paragraph_format.left_indent = Inches(0.5)
+                # Process reading passages
+                if line == "- reading passage :":
+                    heading = word_doc.add_heading("Reading Passage", level=2)
+                    heading.style.font.bold = True
+                    heading.style.font.color.rgb = RGBColor(0, 0, 139)  # Dark blue
                     continue
                 
-                # Regular paragraph
-                if line:
+                # Process questions
+                if line == "- question:":
+                    heading = word_doc.add_heading("Question", level=3)
+                    heading.style.font.bold = True
+                    heading.style.font.color.rgb = RGBColor(139, 0, 0)  # Dark red
+                    continue
+                
+                # Process options
+                if line == "- options":
+                    heading = word_doc.add_heading("Multiple Choice Options", level=4)
+                    heading.style.font.bold = True
+                    heading.style.font.color.rgb = RGBColor(0, 100, 0)  # Dark green
+                    continue
+                
+                # Process metadata lines (section, difficulty, topic)
+                if line.startswith('+') and ('Section:' in line or 'Difficulty:' in line or 'Topic:' in line):
+                    content_text = line[1:].strip()  # Remove the + prefix
+                    if content_text:
+                        para = word_doc.add_paragraph(content_text)
+                        para.paragraph_format.space_after = Pt(3)
+                        para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.LEFT
+                        para.style.font.italic = True
+                        para.style.font.color.rgb = RGBColor(128, 128, 128)  # Gray
+                    continue
+                
+                # Process passage content
+                if line.startswith('+') and len(line) > 1:
+                    content_text = line[1:].strip()  # Remove the + prefix
+                    if content_text:
+                        para = word_doc.add_paragraph(content_text)
+                        para.paragraph_format.space_after = Pt(6)
+                        para.paragraph_format.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
+                    continue
+                
+                # Regular paragraph (fallback)
+                if line and not line.startswith('-'):
                     word_doc.add_paragraph(line)
             
             # Save Word document
@@ -1217,6 +2359,8 @@ def home():
                 margin-bottom: 40px;
             }
 
+
+
             .section {
                 background: #f8f9fa;
                 border-radius: 15px;
@@ -1376,6 +2520,10 @@ def home():
                 .container {
                     padding: 30px 20px;
                 }
+                
+                .training-section {
+                    padding: 20px;
+                }
             }
         </style>
     </head>
@@ -1390,7 +2538,8 @@ def home():
                     <div class="section-title">English Section</div>
                     <div class="section-desc">
                         Remove watermarks and convert to Word with clean text formatting.
-                        Perfect for documents, reports, and general text content.
+                        <strong>Auto-detects SAT documents</strong> for enhanced processing.
+                        Perfect for documents, reports, and SAT practice tests.
                     </div>
                 </div>
 
@@ -1399,10 +2548,13 @@ def home():
                     <div class="section-title">Math Section</div>
                     <div class="section-desc">
                         Auto-detect math functions and convert to Word with LaTeX content.
-                        Ideal for academic papers, equations, and mathematical documents.
+                        <strong>Auto-detects SAT documents</strong> for enhanced processing.
+                        Ideal for academic papers, equations, and SAT math sections.
                     </div>
                 </div>
             </div>
+
+
 
             <div class="drop-zone" id="dropZone">
                 <div class="drop-icon">☁️</div>
@@ -1483,10 +2635,10 @@ def home():
                 
                 if (section === 'english') {
                     englishSection.classList.add('active');
-                    dropZone.querySelector('.drop-subtext').textContent = 'English section: Text processing & watermark removal';
-                } else {
+                    dropZone.querySelector('.drop-subtext').textContent = 'English section: Text processing, watermark removal & SAT detection';
+                } else if (section === 'math') {
                     mathSection.classList.add('active');
-                    dropZone.querySelector('.drop-subtext').textContent = 'Math section: LaTeX conversion & math detection';
+                    dropZone.querySelector('.drop-subtext').textContent = 'Math section: LaTeX conversion, math detection & SAT processing';
                 }
                 
                 // Enable drop zone
@@ -1599,6 +2751,8 @@ def home():
                 }
             }
 
+
+
             // Initialize with English section selected
             selectSection('english');
         </script>
@@ -1632,7 +2786,7 @@ def convert_document():
         
         # Get section type
         section_type = request.form.get('section_type', 'english')
-        if section_type not in ['english', 'math']:
+        if section_type not in ['english', 'math', 'sat']:
             return jsonify({'error': 'Invalid section type'}), 400
         
         # Validate file
@@ -1679,6 +2833,12 @@ def convert_document():
             'error': str(e)
         }), 500
 
+
+
+
+
+
+
 @app.route('/download/<filename>', methods=['GET'])
 def download_file(filename):
     """Download converted file"""
@@ -1712,11 +2872,12 @@ def handle_exception(e):
     return jsonify({'error': 'An unexpected error occurred'}), 500
 
 if __name__ == '__main__':
-    print("Starting PDF Watermark Remover - Two Sections...")
+    print("Starting PDF Watermark Remover - Enhanced SAT Processing...")
     print(f"Python {sys.version} detected")
     print("All dependencies loaded successfully")
     print("Watermark removal algorithms ready")
-    print("Document processor ready")
+    print("SAT document processor ready")
+    print("AI-powered enhancement enabled (Gemini API)")
     
     # Set startup time for health checks
     app_startup_time = time.time()
@@ -1740,7 +2901,8 @@ if __name__ == '__main__':
         threaded = False
     
     print(f"\nServer will start at: http://{host}:{port}")
-    print("Two sections: English (text) and Math (LaTeX)")
+    print("Two sections: English (text + SAT) and Math (LaTeX + SAT)")
+    print("SAT documents auto-detected in both sections")
     print("Health check at: http://{host}:{port}/health")
     print(f"Production mode: {is_production}")
     print(f"Debug mode: {debug}")
