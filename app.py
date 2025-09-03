@@ -86,14 +86,15 @@ try:
     os.makedirs(UPLOAD_FOLDER, exist_ok=True)
     os.makedirs(PROCESSED_FOLDER, exist_ok=True)
     if os.environ.get('RAILWAY_ENVIRONMENT'):
-        print("✅ Railway temp directories created")
+        print(f"✅ Railway temp directories created: {UPLOAD_FOLDER}, {PROCESSED_FOLDER}")
     else:
-        print("✅ Local directories created")
+        print(f"✅ Local directories created: {UPLOAD_FOLDER}, {PROCESSED_FOLDER}")
 except Exception as e:
     print(f"⚠️ Directory creation warning: {e}")
     # Fallback to current directory
     UPLOAD_FOLDER = '.'
     PROCESSED_FOLDER = '.'
+    print(f"⚠️ Using fallback directories: {UPLOAD_FOLDER}, {PROCESSED_FOLDER}")
 
 # Global API key storage - Railway optimized
 GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
@@ -3731,59 +3732,71 @@ def handle_exception(e):
 
 
 if __name__ == '__main__':
-    print("Starting PDF Watermark Remover - Enhanced SAT Processing...")
-    print(f"Python {sys.version} detected")
-    print("All dependencies loaded successfully")
-    print("Watermark removal algorithms ready")
-    print("SAT document processor ready")
-    print("AI-powered enhancement ready (API key configurable via web interface)")
-    
-    # Set startup time for health checks
-    app_startup_time = time.time()
-    print(f"Startup timestamp: {app_startup_time}")
-    
-    # Get port from environment variable (for Railway/Heroku)
-    port = int(os.environ.get('PORT', 5000))
-    
-    # Production optimizations for Railway
-    is_production = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL')
-    
-    if is_production:
-        print("🚀 Production mode detected - Railway deployment")
-        print(f"Railway Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'Unknown')}")
-        print(f"Railway Service: {os.environ.get('RAILWAY_SERVICE_NAME', 'Unknown')}")
-        print(f"Railway Region: {os.environ.get('RAILWAY_REGION', 'Unknown')}")
-        host = '0.0.0.0'
-        debug = False
-        threaded = True
-        # Railway-specific optimizations
-        os.environ['FLASK_ENV'] = 'production'
-        print("✅ Railway production optimizations applied")
-    else:
-        print("🔧 Development mode detected - Local testing")
-        host = 'localhost'
-        debug = True
-        threaded = False
-    
-    print(f"\nServer will start at: http://{host}:{port}")
-    print("Two sections: English (text + SAT) and Math (LaTeX + SAT)")
-    print("SAT documents auto-detected in both sections")
-    print("Health check at: http://{host}:{port}/health")
-    print(f"Production mode: {is_production}")
-    print(f"Debug mode: {debug}")
-    print(f"Threaded: {threaded}")
-    print("Press Ctrl+C to stop the server")
-    print("\n" + "="*60)
-    
     try:
+        print("Starting SAT PDF to Word Converter...")
+        print(f"Python {sys.version} detected")
+        print("All dependencies loaded successfully")
+        print("Unified SAT processing ready")
+        
+        # Set startup time for health checks
+        app_startup_time = time.time()
+        print(f"Startup timestamp: {app_startup_time}")
+        
+        # Get port from environment variable (for Railway/Heroku)
+        port = int(os.environ.get('PORT', 5000))
+        print(f"Port: {port}")
+        
+        # Production optimizations for Railway
+        is_production = os.environ.get('RAILWAY_ENVIRONMENT') or os.environ.get('RAILWAY_STATIC_URL')
+        
+        if is_production:
+            print("🚀 Production mode detected - Railway deployment")
+            print(f"Railway Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'Unknown')}")
+            print(f"Railway Service: {os.environ.get('RAILWAY_SERVICE_NAME', 'Unknown')}")
+            print(f"Railway Region: {os.environ.get('RAILWAY_REGION', 'Unknown')}")
+            host = '0.0.0.0'
+            debug = False
+            threaded = True
+            # Railway-specific optimizations
+            os.environ['FLASK_ENV'] = 'production'
+            print("✅ Railway production optimizations applied")
+        else:
+            print("🔧 Development mode detected - Local testing")
+            host = 'localhost'
+            debug = True
+            threaded = False
+        
+        print(f"\nServer will start at: http://{host}:{port}")
+        print("Unified SAT processing for English and Math sections")
+        print(f"Health check at: http://{host}:{port}/health")
+        print(f"Production mode: {is_production}")
+        print(f"Debug mode: {debug}")
+        print(f"Threaded: {threaded}")
+        print("Press Ctrl+C to stop the server")
+        print("\n" + "="*60)
+        
+        # Test health check endpoint before starting
+        print("Testing health check endpoint...")
+        with app.test_client() as client:
+            response = client.get('/health')
+            if response.status_code == 200:
+                print("✅ Health check endpoint working")
+            else:
+                print(f"❌ Health check endpoint failed: {response.status_code}")
+        
+        print("Starting Flask application...")
         app.run(
             debug=debug, 
             host=host, 
             port=port,
             threaded=threaded
         )
+        
     except KeyboardInterrupt:
         print("\nServer stopped by user")
     except Exception as e:
-        print(f"\nServer error: {e}")
+        print(f"\nServer startup error: {e}")
+        print(f"Error type: {type(e).__name__}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
