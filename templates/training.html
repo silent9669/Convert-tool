@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital SAT Training & Feedback</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .nav a {
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            color: #666;
+        }
+
+        .nav a.active {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .nav a:hover:not(.active) {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .feedback-section {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+        }
+
+        .form-group {
+            margin-bottom: 25px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #333;
+        }
+
+        .rating-stars {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin: 15px 0;
+        }
+
+        .star {
+            font-size: 2em;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            color: #ddd;
+        }
+
+        .star:hover,
+        .star.active {
+            color: #ffc107;
+            transform: scale(1.1);
+        }
+
+        .star:hover ~ .star {
+            color: #ddd;
+        }
+
+        textarea {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-family: inherit;
+            resize: vertical;
+            min-height: 100px;
+            transition: border-color 0.3s ease;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: #4CAF50;
+        }
+
+        .btn {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+            margin: 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .success-message {
+            display: none;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+
+            .nav {
+                flex-direction: column;
+                gap: 10px;
+            }
+
+            .rating-stars {
+                gap: 5px;
+            }
+
+            .star {
+                font-size: 1.5em;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/conversion">📄 Convert PDF</a>
+            <a href="/training" class="active">🎓 Training & Feedback</a>
+        </div>
+
+        <h1>🎓 Training & Feedback</h1>
+        <p class="subtitle">Help us improve the Digital SAT converter</p>
+
+        <div class="success-message" id="successMessage">
+            ✅ Thank you for your feedback! Redirecting to conversion page...
+        </div>
+
+        <div class="error-message" id="errorMessage">
+            ❌ Error submitting feedback. Please try again.
+        </div>
+
+        <div class="feedback-section">
+            <form id="feedbackForm">
+                <div class="form-group">
+                    <label>Rate the conversion quality:</label>
+                    <div class="rating-stars">
+                        <span class="star" data-rating="1">⭐</span>
+                        <span class="star" data-rating="2">⭐</span>
+                        <span class="star" data-rating="3">⭐</span>
+                        <span class="star" data-rating="4">⭐</span>
+                        <span class="star" data-rating="5">⭐</span>
+                    </div>
+                    <input type="hidden" id="rating" name="rating" value="0">
+                </div>
+
+                <div class="form-group">
+                    <label for="comment">Your feedback:</label>
+                    <textarea id="comment" name="comment" placeholder="What worked well? What could be improved?"></textarea>
+                </div>
+
+                <button type="submit" class="btn">🔄 Submit & Regenerate</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        let currentRating = 0;
+        const stars = document.querySelectorAll('.star');
+        const feedbackForm = document.getElementById('feedbackForm');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+
+        // Star rating functionality
+        stars.forEach(star => {
+            star.addEventListener('click', handleStarClick);
+            star.addEventListener('mouseenter', handleStarHover);
+        });
+
+        document.querySelector('.rating-stars').addEventListener('mouseleave', resetStarHover);
+
+        function handleStarClick(e) {
+            currentRating = parseInt(e.target.dataset.rating);
+            updateStarDisplay(currentRating);
+            document.getElementById('rating').value = currentRating;
+        }
+
+        function handleStarHover(e) {
+            const hoverRating = parseInt(e.target.dataset.rating);
+            updateStarDisplay(hoverRating);
+        }
+
+        function resetStarHover() {
+            updateStarDisplay(currentRating);
+        }
+
+        function updateStarDisplay(rating) {
+            stars.forEach((star, index) => {
+                if (index < rating) {
+                    star.classList.add('active');
+                } else {
+                    star.classList.remove('active');
+                }
+            });
+        }
+
+        // Feedback form submission
+        feedbackForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const rating = document.getElementById('rating').value;
+            const comment = document.getElementById('comment').value.trim();
+
+            if (rating === '0') {
+                showError('Please select a rating before submitting.');
+                return;
+            }
+
+            if (!comment) {
+                showError('Please provide feedback comments.');
+                return;
+            }
+
+            try {
+                // Submit feedback
+                const feedbackResponse = await fetch('/feedback', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        conversion_id: generateConversionId(),
+                        rating: parseInt(rating),
+                        comment: comment
+                    })
+                });
+
+                const feedbackResult = await feedbackResponse.json();
+
+                if (feedbackResult.success) {
+                    // Regenerate system
+                    const regenerateResponse = await fetch('/regenerate', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        }
+                    });
+
+                    const regenerateResult = await regenerateResponse.json();
+
+                    if (regenerateResult.success) {
+                        showSuccess();
+                        // Redirect to conversion page after 2 seconds
+                        setTimeout(() => {
+                            window.location.href = '/conversion';
+                        }, 2000);
+                    } else {
+                        showError('Feedback submitted but regeneration failed.');
+                    }
+                } else {
+                    showError(feedbackResult.error || 'Failed to submit feedback');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Network error. Please try again.');
+            }
+        });
+
+        function generateConversionId() {
+            return 'conv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+
+        function showSuccess() {
+            hideMessages();
+            successMessage.style.display = 'block';
+        }
+
+        function showError(message) {
+            hideMessages();
+            errorMessage.style.display = 'block';
+            errorMessage.textContent = message;
+            setTimeout(() => {
+                errorMessage.style.display = 'none';
+            }, 5000);
+        }
+
+        function hideMessages() {
+            successMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

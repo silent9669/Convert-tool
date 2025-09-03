@@ -1,28 +1,21 @@
-# SAT PDF to Word Converter
+# Digital SAT PDF Processor
 
-Convert SAT exam PDFs to Word documents with intelligent content detection and formatting.
+A Python application for converting Digital SAT PDF files to Word documents with OCR support and AI enhancement.
 
 ## Features
-- **Smart Detection**: Automatically identifies reading passages, questions, and multiple choice options
-- **Math Support**: Converts mathematical expressions to LaTeX format
-- **Watermark Removal**: Removes watermarks and cleans up text
-- **SAT Format**: Outputs in proper SAT exam structure (27 English questions = 1 module, 22 Math questions = 1 module)
-- **AI Enhancement**: Uses Gemini AI for improved content detection
+
+- PDF to Word conversion
+- OCR support for scanned documents
+- AI-enhanced question detection
+- Multiple choice option parsing
+- Watermark removal
 
 ## Quick Start
-```bash
-pip install -r requirements.txt
-python app.py
-```
-Visit: http://localhost:5000
 
-## Usage
-1. Upload a SAT PDF file
-2. The system will automatically detect and convert content
-3. Download the formatted Word document
+```bash
+python final_optimized_processor.py
+```
 
 ## Contact
-**Phuc Dang** - phuc.dangcs2007@hcmut.edu.vn
 
-## License
-MIT
+phuc.dangcs2007@hcmut.edu.vn

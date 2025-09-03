@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Digital SAT PDF Converter</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #f5f7fa;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .nav {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .nav a {
+            padding: 12px 24px;
+            border-radius: 25px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            background: #f8f9fa;
+            color: #666;
+        }
+
+        .nav a.active {
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+        }
+
+        .nav a:hover:not(.active) {
+            background: #e9ecef;
+            transform: translateY(-2px);
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 2.2em;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 40px;
+            font-size: 1.1em;
+        }
+
+        .drop-zone {
+            border: 3px dashed #ddd;
+            border-radius: 15px;
+            padding: 60px 20px;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: #fafafa;
+        }
+
+        .drop-zone:hover,
+        .drop-zone.dragover {
+            border-color: #4CAF50;
+            background: #f0fff0;
+            transform: scale(1.02);
+        }
+
+        .drop-icon {
+            font-size: 4em;
+            color: #ddd;
+            margin-bottom: 20px;
+        }
+
+        .drop-zone.dragover .drop-icon {
+            color: #4CAF50;
+        }
+
+        .drop-text {
+            font-size: 1.3em;
+            color: #666;
+            margin-bottom: 10px;
+        }
+
+        .drop-subtext {
+            color: #999;
+            font-size: 0.9em;
+        }
+
+        .file-input {
+            display: none;
+        }
+
+        .progress-section {
+            display: none;
+            margin: 30px 0;
+        }
+
+        .progress-bar {
+            background: #f0f0f0;
+            border-radius: 10px;
+            overflow: hidden;
+            height: 20px;
+            margin-bottom: 15px;
+        }
+
+        .progress-fill {
+            background: linear-gradient(90deg, #4CAF50, #45a049);
+            height: 100%;
+            width: 0%;
+            transition: width 0.3s ease;
+            border-radius: 10px;
+        }
+
+        .status-text {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+        }
+
+        .download-btn {
+            display: none;
+            background: linear-gradient(45deg, #4CAF50, #45a049);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 25px;
+            font-size: 1.2em;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+            text-decoration: none;
+            margin: 10px;
+        }
+
+        .download-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(76, 175, 80, 0.4);
+        }
+
+        .success-message {
+            display: none;
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .error-message {
+            display: none;
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 20px;
+            margin: 30px 0;
+        }
+
+        .stat-item {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            text-align: center;
+        }
+
+        .stat-number {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4CAF50;
+            margin-bottom: 5px;
+        }
+
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .processing {
+            animation: pulse 2s infinite;
+        }
+
+        @media (max-width: 480px) {
+            .container {
+                padding: 30px 20px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .drop-zone {
+                padding: 40px 15px;
+            }
+
+            .nav {
+                flex-direction: column;
+                gap: 10px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="nav">
+            <a href="/conversion" class="active">📄 Convert PDF</a>
+            <a href="/training">🎓 Training & Feedback</a>
+        </div>
+
+        <h1>🎯 Digital SAT PDF Converter</h1>
+        <p class="subtitle">Convert Digital SAT PDFs to Word documents with AI-powered question detection</p>
+
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-icon">📄</div>
+            <div class="drop-text">Drop your PDF here or click to browse</div>
+            <div class="drop-subtext">Supports Digital SAT practice tests and exams</div>
+            <input type="file" id="fileInput" class="file-input" accept=".pdf">
+        </div>
+
+        <div class="progress-section" id="progressSection">
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+            <div class="status-text" id="statusText">Processing...</div>
+        </div>
+
+        <div class="success-message" id="successMessage">
+            <h3>✅ Conversion Complete!</h3>
+            <p>Your Digital SAT PDF has been successfully converted to Word format.</p>
+            
+            <div class="stats-grid">
+                <div class="stat-item">
+                    <div class="stat-number" id="questionCount">0</div>
+                    <div class="stat-label">Questions Detected</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="passageCount">0</div>
+                    <div class="stat-label">Passages Found</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="imageCount">0</div>
+                    <div class="stat-label">Images Extracted</div>
+                </div>
+                <div class="stat-item">
+                    <div class="stat-number" id="sectionCount">0</div>
+                    <div class="stat-label">Sections Identified</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="error-message" id="errorMessage">
+            <h3>❌ Conversion Failed</h3>
+            <p id="errorText">An error occurred during processing.</p>
+        </div>
+
+        <a href="#" class="download-btn" id="downloadBtn">
+            💾 Download Word Document
+        </a>
+    </div>
+
+    <script>
+        let selectedFile = null;
+        let conversionResult = null;
+
+        // Elements
+        const dropZone = document.getElementById('dropZone');
+        const fileInput = document.getElementById('fileInput');
+        const progressSection = document.getElementById('progressSection');
+        const progressFill = document.getElementById('progressFill');
+        const statusText = document.getElementById('statusText');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const downloadBtn = document.getElementById('downloadBtn');
+
+        // Event listeners
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+        downloadBtn.addEventListener('click', downloadResult);
+
+        // Drag and drop events
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            dropZone.addEventListener(eventName, preventDefaults, false);
+        });
+
+        dropZone.addEventListener('dragenter', () => dropZone.classList.add('dragover'));
+        dropZone.addEventListener('dragleave', () => dropZone.classList.remove('dragover'));
+        dropZone.addEventListener('drop', handleDrop);
+
+        function preventDefaults(e) {
+            e.preventDefault();
+            e.stopPropagation();
+        }
+
+        function handleDrop(e) {
+            dropZone.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files);
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        }
+
+        function handleFile(file) {
+            if (file.type !== 'application/pdf') {
+                showError('Please select a PDF file.');
+                return;
+            }
+
+            selectedFile = file;
+            hideMessages();
+            processFile();
+        }
+
+        async function processFile() {
+            progressSection.style.display = 'block';
+            dropZone.classList.add('processing');
+
+            try {
+                const formData = new FormData();
+                formData.append('file', selectedFile);
+
+                updateProgress(10, 'Uploading file...');
+
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                updateProgress(50, 'Processing with AI...');
+
+                const result = await response.json();
+
+                if (result.success) {
+                    updateProgress(100, 'Complete!');
+                    conversionResult = result;
+                    showSuccess(result.metadata);
+                } else {
+                    throw new Error(result.error || 'Processing failed');
+                }
+
+            } catch (error) {
+                console.error('Processing error:', error);
+                showError(error.message);
+            } finally {
+                dropZone.classList.remove('processing');
+            }
+        }
+
+        function updateProgress(percentage, text) {
+            progressFill.style.width = percentage + '%';
+            statusText.textContent = text;
+        }
+
+        function showSuccess(metadata) {
+            progressSection.style.display = 'none';
+            successMessage.style.display = 'block';
+            downloadBtn.style.display = 'inline-block';
+            
+            // Update stats
+            document.getElementById('questionCount').textContent = metadata.total_questions || 0;
+            document.getElementById('passageCount').textContent = metadata.total_passages || 0;
+            document.getElementById('imageCount').textContent = metadata.images || 0;
+            document.getElementById('sectionCount').textContent = metadata.sections ? metadata.sections.length : 0;
+        }
+
+        function showError(message) {
+            progressSection.style.display = 'none';
+            errorMessage.style.display = 'block';
+            document.getElementById('errorText').textContent = message;
+        }
+
+        function hideMessages() {
+            successMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+            downloadBtn.style.display = 'none';
+        }
+
+        function downloadResult(e) {
+            e.preventDefault();
+            if (conversionResult && conversionResult.output_file) {
+                window.location.href = `/download/${conversionResult.output_file}`;
+            }
+        }
+    </script>
+</body>
+</html>
