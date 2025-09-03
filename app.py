@@ -67,6 +67,9 @@ MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
+# Global API key storage
+GEMINI_API_KEY = None
+
 class EnhancedWatermarkRemover:
     """Advanced PDF watermark removal with AI-powered training and image detection"""
     
@@ -95,9 +98,15 @@ class EnhancedWatermarkRemover:
         # AI Training parameters
         self.use_ai_training = True     # Enable AI-powered training
         self.ai_providers = ['gemini', 'openai']  # Supported AI providers
-        self.ai_api_keys = {
-            'gemini': 'AIzaSyBRTfao10Uxm-VBLTYsKo4QsFnfRtCtdIg'  # Pre-configured Gemini key
-        }
+        self.ai_api_keys = {}  # Will be set via web interface
+        
+    def set_api_key(self, provider: str, api_key: str):
+        """Set API key for a specific provider"""
+        if provider in self.ai_providers:
+            self.ai_api_keys[provider] = api_key
+            logger.info(f"API key set for {provider}")
+            return True
+        return False
         
         # Image detection parameters
         self.image_detection_enabled = True
@@ -2305,6 +2314,35 @@ def live():
         'timestamp': time.time()
     })
 
+@app.route('/api-key', methods=['POST'])
+def update_api_key():
+    """Update API key for AI enhancement"""
+    try:
+        data = request.get_json()
+        api_key = data.get('api_key', '').strip()
+        provider = data.get('provider', 'gemini')
+        
+        if not api_key:
+            return jsonify({'success': False, 'error': 'API key is required'}), 400
+        
+        # Store globally and in watermark remover
+        global GEMINI_API_KEY
+        GEMINI_API_KEY = api_key
+        
+        # Update watermark remover instance
+        watermark_remover = get_processor().watermark_remover
+        watermark_remover.set_api_key(provider, api_key)
+        
+        logger.info(f"API key updated for {provider}")
+        return jsonify({
+            'success': True, 
+            'message': f'API key updated successfully for {provider}'
+        })
+        
+    except Exception as e:
+        logger.error(f"API key update failed: {str(e)}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
 @app.route('/home')
 def home():
     """Simple home page with two sections"""
@@ -2350,6 +2388,77 @@ def home():
                 text-align: center;
                 margin-bottom: 40px;
                 font-size: 1.1em;
+            }
+
+            .api-key-section {
+                background: #f8f9fa;
+                border-radius: 15px;
+                padding: 25px;
+                margin-bottom: 30px;
+                border: 1px solid #e9ecef;
+            }
+
+            .api-key-section h3 {
+                color: #333;
+                margin-bottom: 10px;
+                font-size: 1.3em;
+            }
+
+            .api-key-section p {
+                color: #666;
+                margin-bottom: 20px;
+                font-size: 0.95em;
+            }
+
+            .api-input-group {
+                display: flex;
+                gap: 15px;
+                margin-bottom: 15px;
+            }
+
+            .api-key-input {
+                flex: 1;
+                padding: 12px 15px;
+                border: 2px solid #ddd;
+                border-radius: 8px;
+                font-size: 1em;
+                transition: border-color 0.3s ease;
+            }
+
+            .api-key-input:focus {
+                outline: none;
+                border-color: #4CAF50;
+            }
+
+            .api-key-btn {
+                background: linear-gradient(45deg, #4CAF50, #45a049);
+                color: white;
+                border: none;
+                padding: 12px 20px;
+                border-radius: 8px;
+                font-size: 1em;
+                font-weight: 600;
+                cursor: pointer;
+                transition: all 0.3s ease;
+                white-space: nowrap;
+            }
+
+            .api-key-btn:hover {
+                transform: translateY(-2px);
+                box-shadow: 0 5px 15px rgba(76, 175, 80, 0.3);
+            }
+
+            .api-key-status {
+                min-height: 20px;
+                font-size: 0.9em;
+            }
+
+            .api-key-status.success {
+                color: #155724;
+            }
+
+            .api-key-status.error {
+                color: #721c24;
             }
 
             .sections {
@@ -2532,6 +2641,17 @@ def home():
             <h1>📄 PDF Watermark Remover</h1>
             <p class="subtitle">Two sections: English (text) and Math (LaTeX)</p>
 
+            <!-- API Key Input Section -->
+            <div class="api-key-section">
+                <h3>🔑 AI Enhancement Setup</h3>
+                <p>Enter your Gemini API key for enhanced watermark removal and AI-powered processing:</p>
+                <div class="api-input-group">
+                    <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" class="api-key-input">
+                    <button onclick="updateApiKey()" class="api-key-btn">Set API Key</button>
+                </div>
+                <div id="apiKeyStatus" class="api-key-status"></div>
+            </div>
+
             <div class="sections">
                 <div class="section" id="englishSection" onclick="selectSection('english')">
                     <div class="section-icon">📝</div>
@@ -2600,6 +2720,8 @@ def home():
             const successMessage = document.getElementById('successMessage');
             const errorMessage = document.getElementById('errorMessage');
             const downloadBtn = document.getElementById('downloadBtn');
+            const apiKeyInput = document.getElementById('apiKeyInput');
+            const apiKeyStatus = document.getElementById('apiKeyStatus');
 
             // Event listeners
             dropZone.addEventListener('click', () => {
@@ -2745,6 +2867,50 @@ def home():
                 downloadBtn.style.display = 'none';
             }
 
+            async function updateApiKey() {
+                const apiKey = apiKeyInput.value.trim();
+                if (!apiKey) {
+                    showApiKeyStatus('Please enter an API key', 'error');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api-key', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                        },
+                        body: JSON.stringify({
+                            api_key: apiKey,
+                            provider: 'gemini'
+                        })
+                    });
+
+                    const result = await response.json();
+                    
+                    if (result.success) {
+                        showApiKeyStatus(result.message, 'success');
+                        apiKeyInput.value = '';
+                    } else {
+                        showApiKeyStatus(result.error || 'Failed to update API key', 'error');
+                    }
+                } catch (error) {
+                    console.error('API key update error:', error);
+                    showApiKeyStatus('Failed to update API key. Please try again.', 'error');
+                }
+            }
+
+            function showApiKeyStatus(message, type) {
+                apiKeyStatus.textContent = message;
+                apiKeyStatus.className = `api-key-status ${type}`;
+                
+                // Clear status after 5 seconds
+                setTimeout(() => {
+                    apiKeyStatus.textContent = '';
+                    apiKeyStatus.className = 'api-key-status';
+                }, 5000);
+            }
+
             function downloadResult() {
                 if (processedFile) {
                     window.open(`/download/${processedFile}`, '_blank');
@@ -2877,7 +3043,7 @@ if __name__ == '__main__':
     print("All dependencies loaded successfully")
     print("Watermark removal algorithms ready")
     print("SAT document processor ready")
-    print("AI-powered enhancement enabled (Gemini API)")
+    print("AI-powered enhancement ready (API key configurable via web interface)")
     
     # Set startup time for health checks
     app_startup_time = time.time()
