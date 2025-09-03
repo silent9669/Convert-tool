@@ -69,27 +69,53 @@ if os.environ.get('RAILWAY_ENVIRONMENT'):
 app = Flask(__name__)
 CORS(app)
 
-# Configuration
-UPLOAD_FOLDER = 'uploads'
-PROCESSED_FOLDER = 'processed'
+# Railway production optimizations
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE
+    app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching for development
+    app.config['TEMPLATES_AUTO_RELOAD'] = False  # Disable auto-reload in production
+
+# Configuration - Railway optimized
+UPLOAD_FOLDER = '/tmp/uploads' if os.environ.get('RAILWAY_ENVIRONMENT') else 'uploads'
+PROCESSED_FOLDER = '/tmp/processed' if os.environ.get('RAILWAY_ENVIRONMENT') else 'processed'
 ALLOWED_EXTENSIONS = {'pdf'}
 MAX_FILE_SIZE = 100 * 1024 * 1024  # 100MB
 
-# Ensure directories exist
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(PROCESSED_FOLDER, exist_ok=True)
-
-# Global API key storage
-GEMINI_API_KEY = None
-
-# Try to load local config for testing
+# Ensure directories exist (Railway uses /tmp for writable directories)
 try:
-    from local_config import GEMINI_API_KEY as LOCAL_API_KEY
-    if LOCAL_API_KEY:
-        GEMINI_API_KEY = LOCAL_API_KEY
-        print("✅ Local API key loaded for testing")
-except ImportError:
-    print("ℹ️ No local config found - API key will be set via web interface")
+    os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+    os.makedirs(PROCESSED_FOLDER, exist_ok=True)
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        print("✅ Railway temp directories created")
+    else:
+        print("✅ Local directories created")
+except Exception as e:
+    print(f"⚠️ Directory creation warning: {e}")
+    # Fallback to current directory
+    UPLOAD_FOLDER = '.'
+    PROCESSED_FOLDER = '.'
+
+# Global API key storage - Railway optimized
+GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY')
+
+# Try to load local config for testing (only in development)
+if not GEMINI_API_KEY:
+    try:
+        from local_config import GEMINI_API_KEY as LOCAL_API_KEY
+        if LOCAL_API_KEY:
+            GEMINI_API_KEY = LOCAL_API_KEY
+            print("✅ Local API key loaded for testing")
+    except ImportError:
+        print("ℹ️ No local config found - API key will be set via web interface")
+
+# Railway production check
+if os.environ.get('RAILWAY_ENVIRONMENT'):
+    if GEMINI_API_KEY:
+        print("✅ Railway API key loaded from environment")
+    else:
+        print("⚠️ No GEMINI_API_KEY found in Railway environment variables")
+else:
+    print("🔧 Development mode - API key from local config or web interface")
 
 class EnhancedWatermarkRemover:
     """Advanced PDF watermark removal with AI-powered training and image detection"""
@@ -121,11 +147,14 @@ class EnhancedWatermarkRemover:
         self.ai_providers = ['gemini', 'openai']  # Supported AI providers
         self.ai_api_keys = {}  # Will be set via web interface - no hardcoded keys
         
-        # Use global API key if available (for testing)
+        # Use global API key if available (Railway or local)
         global GEMINI_API_KEY
         if GEMINI_API_KEY:
             self.ai_api_keys['gemini'] = GEMINI_API_KEY
-            logger.info("API key loaded from local config for testing")
+            if os.environ.get('RAILWAY_ENVIRONMENT'):
+                logger.info("API key loaded from Railway environment")
+            else:
+                logger.info("API key loaded from local config for testing")
         
     def set_api_key(self, provider: str, api_key: str):
         """Set API key for a specific provider"""
@@ -2353,6 +2382,31 @@ class DocumentProcessor:
         self.advanced_processor = AdvancedSATProcessor()  # New advanced processor
         logger.info("Enhanced document processor initialized with SAT support")
     
+    def process_document_unified(self, input_path: str) -> Tuple[str, Dict]:
+        """Process document using unified SAT processing (auto-detects English/Math)"""
+        try:
+            logger.info(f"Processing document with unified system: {input_path}")
+            
+            # Use the SAT processor with unified processing
+            output_path = self.sat_processor.process_sat_document_unified(input_path)
+            
+            # Get file stats
+            file_size = os.path.getsize(output_path) if os.path.exists(output_path) else 0
+            
+            # Prepare stats
+            stats = {
+                'processing_type': 'unified_sat',
+                'file_size': file_size,
+                'success': True
+            }
+            
+            logger.info(f"Unified processing completed successfully")
+            return output_path, stats
+            
+        except Exception as e:
+            logger.error(f"Unified processing failed: {e}")
+            raise
+
     def process_document_advanced(self, input_path: str) -> Tuple[str, Dict]:
         """Process document using the advanced SAT processor"""
         try:
@@ -3029,75 +3083,18 @@ def update_api_key():
         logger.error(f"API key update failed: {str(e)}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
-@app.route('/api/feedback', methods=['POST'])
-def submit_feedback():
-    """Submit user feedback for AI training"""
-    try:
-        data = request.get_json()
-        feedback = data.get('feedback', '').strip()
-        timestamp = data.get('timestamp', '')
-        
-        if not feedback:
-            return jsonify({'error': 'Feedback is required'}), 400
-        
-        # Log feedback for AI training
-        logger.info(f"User feedback received: {feedback}")
-        
-        # Store feedback for AI training (in a real implementation, you'd save to database)
-        feedback_data = {
-            'feedback': feedback,
-            'timestamp': timestamp,
-            'user_agent': request.headers.get('User-Agent', ''),
-            'ip_address': request.remote_addr,
-            'training_type': 'sat_format_improvement'
-        }
-        
-        # Save feedback to file for AI training analysis
-        try:
-            import json
-            import os
-            
-            feedback_file = 'training_feedback.json'
-            feedback_list = []
-            
-            # Load existing feedback if file exists
-            if os.path.exists(feedback_file):
-                with open(feedback_file, 'r', encoding='utf-8') as f:
-                    feedback_list = json.load(f)
-            
-            # Add new feedback
-            feedback_list.append(feedback_data)
-            
-            # Save updated feedback
-            with open(feedback_file, 'w', encoding='utf-8') as f:
-                json.dump(feedback_list, f, indent=2, ensure_ascii=False)
-            
-            logger.info(f"Feedback saved to {feedback_file} for AI training")
-            
-        except Exception as e:
-            logger.warning(f"Failed to save feedback to file: {e}")
-        
-        logger.info(f"Feedback data: {feedback_data}")
-        
-        return jsonify({
-            'message': 'Feedback submitted successfully',
-            'status': 'received'
-        })
-        
-    except Exception as e:
-        logger.error(f"Feedback submission failed: {e}")
-        return jsonify({'error': 'Failed to submit feedback'}), 500
+
 
 @app.route('/home')
 def home():
-    """Simple home page with two sections"""
+    """Unified SAT PDF to Word Converter"""
     html_content = """
     <!DOCTYPE html>
     <html lang="en">
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>PDF Watermark Remover - Two Sections</title>
+        <title>SAT PDF to Word Converter</title>
         <style>
             * {
                 margin: 0;
@@ -3436,59 +3433,14 @@ def home():
     </head>
     <body>
         <div class="container">
-            <h1>📄 PDF Watermark Remover</h1>
-            <p class="subtitle">Two sections: English (text) and Math (LaTeX)</p>
+            <h1>📄 SAT PDF to Word Converter</h1>
+            <p class="subtitle">Unified processing for English and Math sections</p>
 
-                    <!-- API Key Input Section -->
-        <div class="api-key-section">
-            <h3>🔑 AI Enhancement Setup</h3>
-            <p>Enter your Gemini API key for enhanced watermark removal and AI-powered processing:</p>
-            <div class="api-input-group">
-                <input type="password" id="apiKeyInput" placeholder="Enter your Gemini API key" class="api-key-input">
-                <button onclick="updateApiKey()" class="api-key-btn">Set API Key</button>
-            </div>
-            <div id="apiKeyStatus" class="api-key-status"></div>
-        </div>
-
-        <!-- AI Training Section -->
-        <div class="training-section">
-            <h3>🤖 AI Training & Feedback</h3>
-            <p>Help improve the AI by providing feedback on watermark detection and format recognition:</p>
-            <div class="training-controls">
-                <button onclick="startTraining()" class="training-btn">Start AI Training Session</button>
-                <button onclick="provideFeedback()" class="feedback-btn">Provide Feedback</button>
-            </div>
-            <div id="trainingStatus" class="training-status"></div>
-        </div>
-
-            <div class="sections">
-                <div class="section" id="englishSection" onclick="selectSection('english')">
-                    <div class="section-icon">📝</div>
-                    <div class="section-title">English Section</div>
-                    <div class="section-desc">
-                        Remove watermarks and convert to Word with clean text formatting.
-                        <strong>Auto-detects SAT documents</strong> for enhanced processing.
-                        Perfect for documents, reports, and SAT practice tests.
-                    </div>
-                </div>
-
-                <div class="section" id="mathSection" onclick="selectSection('math')">
-                    <div class="section-icon">🧮</div>
-                    <div class="section-title">Math Section</div>
-                    <div class="section-desc">
-                        Auto-detect math functions and convert to Word with LaTeX content.
-                        <strong>Auto-detects SAT documents</strong> for enhanced processing.
-                        Ideal for academic papers, equations, and SAT math sections.
-                    </div>
-                </div>
-            </div>
-
-
-
+            <!-- File Upload Section -->
             <div class="drop-zone" id="dropZone">
-                <div class="drop-icon">☁️</div>
-                <div class="drop-text">Drop PDF file here or click to browse</div>
-                <div class="drop-subtext">Select a section above first</div>
+                <div class="drop-icon">📄</div>
+                <div class="drop-text">Drop SAT PDF file here or click to browse</div>
+                <div class="drop-subtext">Auto-detects English and Math sections</div>
                 <input type="file" id="fileInput" class="file-input" accept=".pdf">
             </div>
 
@@ -3515,12 +3467,9 @@ def home():
         </div>
 
         <script>
-            let selectedSection = null;
             let processedFile = null;
 
             // Elements
-            const englishSection = document.getElementById('englishSection');
-            const mathSection = document.getElementById('mathSection');
             const dropZone = document.getElementById('dropZone');
             const fileInput = document.getElementById('fileInput');
             const progressSection = document.getElementById('progressSection');
@@ -3529,17 +3478,9 @@ def home():
             const successMessage = document.getElementById('successMessage');
             const errorMessage = document.getElementById('errorMessage');
             const downloadBtn = document.getElementById('downloadBtn');
-            const apiKeyInput = document.getElementById('apiKeyInput');
-            const apiKeyStatus = document.getElementById('apiKeyStatus');
 
             // Event listeners
-            dropZone.addEventListener('click', () => {
-                if (selectedSection) {
-                    fileInput.click();
-                } else {
-                    alert('Please select a section first (English or Math)');
-                }
-            });
+            dropZone.addEventListener('click', () => fileInput.click());
             fileInput.addEventListener('change', handleFileSelect);
             downloadBtn.addEventListener('click', downloadResult);
 
@@ -3557,32 +3498,10 @@ def home():
                 e.stopPropagation();
             }
 
-            function selectSection(section) {
-                selectedSection = section;
-                
-                // Update UI
-                englishSection.classList.remove('active');
-                mathSection.classList.remove('active');
-                
-                if (section === 'english') {
-                    englishSection.classList.add('active');
-                    dropZone.querySelector('.drop-subtext').textContent = 'English section: Text processing, watermark removal & SAT detection';
-                } else if (section === 'math') {
-                    mathSection.classList.add('active');
-                    dropZone.querySelector('.drop-subtext').textContent = 'Math section: LaTeX conversion, math detection & SAT processing';
-                }
-                
-                // Enable drop zone
-                dropZone.style.cursor = 'pointer';
-                dropZone.style.opacity = '1';
-            }
+
 
             function handleDrop(e) {
                 dropZone.classList.remove('dragover');
-                if (!selectedSection) {
-                    alert('Please select a section first (English or Math)');
-                    return;
-                }
                 const files = Array.from(e.dataTransfer.files);
                 if (files.length > 0) {
                     handleFile(files[0]);
@@ -3590,10 +3509,6 @@ def home():
             }
 
             function handleFileSelect(e) {
-                if (!selectedSection) {
-                    alert('Please select a section first (English or Math)');
-                    return;
-                }
                 const files = Array.from(e.target.files);
                 if (files.length > 0) {
                     handleFile(files[0]);
@@ -3620,7 +3535,6 @@ def home():
                     // Create FormData
                     const formData = new FormData();
                     formData.append('file', file);
-                    formData.append('section_type', selectedSection);
                     
                     updateProgress(30, 'Processing document...');
                     
@@ -3676,96 +3590,7 @@ def home():
                 downloadBtn.style.display = 'none';
             }
 
-            async function updateApiKey() {
-                const apiKey = apiKeyInput.value.trim();
-                if (!apiKey) {
-                    showApiKeyStatus('Please enter an API key', 'error');
-                    return;
-                }
 
-                try {
-                    const response = await fetch('/api-key', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            api_key: apiKey,
-                            provider: 'gemini'
-                        })
-                    });
-
-                    const result = await response.json();
-                    
-                    if (result.success) {
-                        showApiKeyStatus(result.message, 'success');
-                        apiKeyInput.value = '';
-                    } else {
-                        showApiKeyStatus(result.error || 'Failed to update API key', 'error');
-                    }
-                } catch (error) {
-                    console.error('API key update error:', error);
-                    showApiKeyStatus('Failed to update API key. Please try again.', 'error');
-                }
-            }
-
-            function showApiKeyStatus(message, type) {
-                apiKeyStatus.textContent = message;
-                apiKeyStatus.className = `api-key-status ${type}`;
-                
-                // Clear status after 5 seconds
-                setTimeout(() => {
-                    apiKeyStatus.textContent = '';
-                    apiKeyStatus.className = 'api-key-status';
-                }, 5000);
-            }
-
-            // AI Training Functions
-            function startTraining() {
-                const status = document.getElementById('trainingStatus');
-                status.innerHTML = '🤖 Starting AI training session...<br>Upload a PDF to begin interactive training.';
-                
-                // Enable training mode
-                window.trainingMode = true;
-                showTrainingStatus('Training mode activated. Upload a PDF to provide feedback.', 'info');
-            }
-
-            function provideFeedback() {
-                const feedback = prompt('Please provide feedback on the AI\'s performance:\n\n1. Was watermark detection accurate?\n2. Was the SAT format correctly identified?\n3. Any specific improvements needed?');
-                
-                if (feedback) {
-                    // Send feedback to backend
-                    fetch('/api/feedback', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify({
-                            feedback: feedback,
-                            timestamp: new Date().toISOString()
-                        })
-                    })
-                    .then(response => response.json())
-                    .then(data => {
-                        showTrainingStatus('✅ Feedback submitted successfully! Thank you for helping improve the AI.', 'success');
-                    })
-                    .catch(error => {
-                        showTrainingStatus('❌ Failed to submit feedback. Please try again.', 'error');
-                    });
-                }
-            }
-
-            function showTrainingStatus(message, type) {
-                const status = document.getElementById('trainingStatus');
-                status.innerHTML = message;
-                status.className = `training-status ${type}`;
-                
-                // Clear status after 5 seconds
-                setTimeout(() => {
-                    status.innerHTML = '';
-                    status.className = 'training-status';
-                }, 5000);
-            }
 
             function downloadResult() {
                 if (processedFile) {
@@ -3786,13 +3611,25 @@ def home():
 
 @app.route('/health', methods=['GET'])
 def health_check():
-    """Health check endpoint"""
-    return jsonify({
+    """Health check endpoint - Railway optimized"""
+    health_data = {
         'status': 'healthy', 
-        'service': 'PDF Watermark Remover - Two Sections',
+        'service': 'SAT PDF to Word Converter',
         'python_version': sys.version,
-        'timestamp': time.time()
-    })
+        'timestamp': time.time(),
+        'environment': 'production' if os.environ.get('RAILWAY_ENVIRONMENT') else 'development'
+    }
+    
+    # Add Railway-specific info
+    if os.environ.get('RAILWAY_ENVIRONMENT'):
+        health_data.update({
+            'railway_environment': os.environ.get('RAILWAY_ENVIRONMENT'),
+            'railway_service': os.environ.get('RAILWAY_SERVICE_NAME'),
+            'railway_region': os.environ.get('RAILWAY_REGION'),
+            'api_key_configured': bool(GEMINI_API_KEY)
+        })
+    
+    return jsonify(health_data)
 
 @app.route('/convert', methods=['POST'])
 def convert_document():
@@ -3806,10 +3643,8 @@ def convert_document():
         if file.filename == '':
             return jsonify({'error': 'No file selected'}), 400
         
-        # Get section type
-        section_type = request.form.get('section_type', 'english')
-        if section_type not in ['english', 'math', 'sat']:
-            return jsonify({'error': 'Invalid section type'}), 400
+        # Unified processing - auto-detect content type
+        section_type = 'unified'
         
         # Validate file
         if not file or not allowed_file(file.filename):
@@ -3828,10 +3663,10 @@ def convert_document():
         file_path = os.path.join(UPLOAD_FOLDER, filename)
         file.save(file_path)
         
-        logger.info(f"File uploaded: {filename} ({file_size // 1024} KB) for {section_type} section")
+        logger.info(f"File uploaded: {filename} ({file_size // 1024} KB) for unified processing")
         
-        # Process document
-        output_path, metadata = get_processor().process_document(file_path, section_type)
+        # Process document with unified system
+        output_path, metadata = get_processor().process_document_unified(file_path)
         
         # Clean up uploaded file
         try:
@@ -3843,7 +3678,7 @@ def convert_document():
         # Return success response
         return jsonify({
             'success': True,
-            'message': f'Document converted successfully using {section_type} section',
+            'message': 'Document converted successfully using unified processing',
             'output_file': os.path.basename(output_path),
             'metadata': metadata
         })
@@ -3893,64 +3728,7 @@ def handle_exception(e):
     logger.error(f"Unhandled exception: {str(e)}")
     return jsonify({'error': 'An unexpected error occurred'}), 500
 
-@app.route('/train', methods=['POST'])
-def train_model():
-    """Train the watermark detection model with user feedback"""
-    try:
-        data = request.get_json()
-        
-        # Get user feedback
-        user_feedback = {
-            'remove': data.get('remove', []),
-            'preserve': data.get('preserve', []),
-            'document_path': data.get('document_path', ''),
-            'comment': data.get('comment', ''),
-            'action': data.get('action', ''),  # 'approve' or 'deny'
-            'timestamp': datetime.now().isoformat()
-        }
-        
-        # Train the model based on user action
-        processor = DocumentProcessor()
-        success = False
-        
-        if user_feedback['action'] == 'deny':
-            # User denied the output, retrain and regenerate
-            success = processor.watermark_remover.train_on_document(
-                user_feedback['document_path'], 
-                user_feedback
-            )
-            message = 'Model retrained based on your feedback. Please try processing again.'
-        elif user_feedback['action'] == 'approve':
-            # User approved, learn from the successful output
-            success = processor.watermark_remover.learn_from_approval(
-                user_feedback['document_path'], 
-                user_feedback
-            )
-            message = 'Model learned from your approval. Thank you for the feedback!'
-        else:
-            message = 'Invalid action. Please use "approve" or "deny".'
-        
-        # Save feedback for analysis
-        feedback_file = 'training_feedback.json'
-        if os.path.exists(feedback_file):
-            with open(feedback_file, 'r') as f:
-                feedback_data = json.load(f)
-        else:
-            feedback_data = []
-        
-        feedback_data.append(user_feedback)
-        
-        with open(feedback_file, 'w') as f:
-            json.dump(feedback_data, f, indent=2)
-        
-        return jsonify({
-            'success': success,
-            'message': message
-        })
-        
-    except Exception as e:
-        logger.error(f"Training error: {e}")
-        return jsonify({'success': False, 'message': str(e)}), 500
+
 
 if __name__ == '__main__':
     print("Starting PDF Watermark Remover - Enhanced SAT Processing...")
@@ -3972,9 +3750,15 @@ if __name__ == '__main__':
     
     if is_production:
         print("🚀 Production mode detected - Railway deployment")
+        print(f"Railway Environment: {os.environ.get('RAILWAY_ENVIRONMENT', 'Unknown')}")
+        print(f"Railway Service: {os.environ.get('RAILWAY_SERVICE_NAME', 'Unknown')}")
+        print(f"Railway Region: {os.environ.get('RAILWAY_REGION', 'Unknown')}")
         host = '0.0.0.0'
         debug = False
         threaded = True
+        # Railway-specific optimizations
+        os.environ['FLASK_ENV'] = 'production'
+        print("✅ Railway production optimizations applied")
     else:
         print("🔧 Development mode detected - Local testing")
         host = 'localhost'
